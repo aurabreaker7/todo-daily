@@ -678,215 +678,92 @@ let CU = null, CU_ID = null, DB = {}, viewDate = new Date(), tFilter = 'all';
 let calY = new Date().getFullYear(), calM = new Date().getMonth();
 let editId = null, editDK = null;
  
-// ══════════════════════════════════════════════
-//  STUDY TIMER STATE
-// ══════════════════════════════════════════════
-const SUBJECT_COLORS = ['#38c9a8','#e8a838','#a87de8','#e85c5c','#e8d038','#4a9eff','#ff7b54','#b5e853','#ff54a8','#54c8ff'];
-let studySubjects = []; // [{id, name, seconds, running, interval, color}]
-let studyActiveId = null;
-let studyTickInterval = null;
-const STUDY_STORAGE_KEY = 'tb_study_v1';
-const STUDY_DATE_KEY = 'tb_study_date_v1';
- 
-function loadStudyData(){
-  const today = tKey();
-  const savedDate = localStorage.getItem(STUDY_DATE_KEY);
-  if(savedDate && savedDate !== today){
-    // New day — reset seconds but keep subjects
-    const saved = JSON.parse(localStorage.getItem(STUDY_STORAGE_KEY)||'[]');
-    studySubjects = saved.map(s=>({...s, seconds:0, running:false}));
-    studyActiveId = null;
+//* ── toggle timer for a subject ── */
+function toggleStudy(id){
+  const subj=studySubjects.find(s=>s.id===id);
+  if(!subj)return;
+  if(subj.running){
+    // PAUSE
+    clearInterval(subj._interval);subj._interval=null;subj.running=false;
+    saveStudy();patchRowUI(subj);
   } else {
-    const saved = localStorage.getItem(STUDY_STORAGE_KEY);
-    if(saved){
-      studySubjects = JSON.parse(saved).map(s=>({...s, running:false}));
-      studyActiveId = null;
-    }
+    // stop any other running timer first (instant, no re-render)
+    studySubjects.forEach(s=>{
+      if(s.running){clearInterval(s._interval);s._interval=null;s.running=false;patchRowUI(s);}
+    });
+    // START
+    subj.running=true;patchRowUI(subj);
+    subj._interval=setInterval(()=>{
+      subj.seconds++;
+      // update only this row's display — zero DOM thrash
+      const tEl=document.getElementById('stime-'+id);
+      if(tEl)tEl.textContent=sfmt(subj.seconds);
+      // update progress bars relative to current max
+      const maxSec=Math.max(...studySubjects.map(s=>s.seconds),1);
+      studySubjects.forEach(s=>{
+        const pb=document.getElementById('sprog-'+s.id);
+        if(pb)pb.style.width=((s.seconds/maxSec)*100)+'%';
+      });
+      updateTotal();
+      if(subj.seconds%10===0)saveStudy(); // batch saves
+    },1000);
   }
-  localStorage.setItem(STUDY_DATE_KEY, today);
-  renderStudySubjects();
 }
- 
-function saveStudyData(){
-  const toSave = studySubjects.map(s=>({id:s.id,name:s.name,seconds:s.seconds,color:s.color}));
-  localStorage.setItem(STUDY_STORAGE_KEY, JSON.stringify(toSave));
-  localStorage.setItem(STUDY_DATE_KEY, tKey());
+
+/* ── reset one subject ── */
+function resetSubj(id){
+  const s=studySubjects.find(x=>x.id===id);
+  if(!s)return;
+  if(s.running){clearInterval(s._interval);s._interval=null;s.running=false;}
+  s.seconds=0;saveStudy();updateTotal();
+  const tEl=document.getElementById('stime-'+id);
+  const pb=document.getElementById('sprog-'+id);
+  if(tEl)tEl.textContent=sfmt(0);
+  if(pb)pb.style.width='0%';
+  patchRowUI(s);
+  toast('↺','Timer reset.','inf');
 }
- 
-function studyFmtTime(seconds){
-  const h = Math.floor(seconds/3600);
-  const m = Math.floor((seconds%3600)/60);
-  const s = seconds % 60;
-  if(h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+
+/* ── delete subject ── */
+function deleteSubj(id){
+  const s=studySubjects.find(x=>x.id===id);
+  if(s&&s.running){clearInterval(s._interval);}
+  studySubjects=studySubjects.filter(x=>x.id!==id);
+  saveStudy();renderStudy(); // structural change — full re-render ok
 }
- 
-function updateStudyTotal(){
-  const total = studySubjects.reduce((a,s)=>a+s.seconds,0);
-  const h = Math.floor(total/3600);
-  const m = Math.floor((total%3600)/60);
-  document.getElementById('studyTotalDisplay').textContent = `${h}h ${String(m).padStart(2,'0')}m`;
+
+/* ── rename ── */
+function renameSubj(id,name){
+  const s=studySubjects.find(x=>x.id===id);
+  if(s&&name.trim()){s.name=name.trim();saveStudy();}
 }
- 
+
+/* ── reset all ── */
+function resetAllStudy(){
+  if(!confirm('Reset all study timers to 0?'))return;
+  studySubjects.forEach(s=>{if(s.running){clearInterval(s._interval);s._interval=null;s.running=false;}s.seconds=0;});
+  saveStudy();renderStudy();toast('↺','All timers reset.','inf');
+}
+
+/* ── add subject UI ── */
 function openAddSubject(){
-  if(studySubjects.length >= 10){ toast('⚠️','Maximum 10 subjects allowed!','err'); return; }
+  if(studySubjects.length>=10){toast('⚠️','Max 10 subjects!','err');return;}
   document.getElementById('studyAddRow').classList.add('open');
   document.getElementById('studyNewName').value='';
   document.getElementById('studyNewName').focus();
-  document.getElementById('studyAddBtn').disabled = true;
+  document.getElementById('studyAddBtn').disabled=true;
 }
- 
 function cancelAddSubject(){
   document.getElementById('studyAddRow').classList.remove('open');
-  document.getElementById('studyAddBtn').disabled = false;
+  document.getElementById('studyAddBtn').disabled=(studySubjects.length>=10);
 }
- 
 function confirmAddSubject(){
-  const name = document.getElementById('studyNewName').value.trim();
-  if(!name){ toast('⚠️','Enter subject name!','err'); return; }
-  if(studySubjects.length >= 10){ toast('⚠️','Max 10 subjects!','err'); return; }
-  const colorIdx = studySubjects.length % SUBJECT_COLORS.length;
-  studySubjects.push({
-    id: Date.now(),
-    name,
-    seconds: 0,
-    running: false,
-    color: SUBJECT_COLORS[colorIdx]
-  });
-  saveStudyData();
-  cancelAddSubject();
-  renderStudySubjects();
+  const name=document.getElementById('studyNewName').value.trim();
+  if(!name){toast('⚠️','Enter a subject name!','err');return;}
+  if(studySubjects.length>=10){toast('⚠️','Max 10 subjects!','err');return;}
+  studySubjects.push({id:Date.now(),name,seconds:0,running:false,_interval:null,color:SUBJECT_COLORS[studySubjects.length%SUBJECT_COLORS.length]});
+  saveStudy();cancelAddSubject();renderStudy();
   toast('📚','Subject added!','suc');
-}
- 
-function toggleSubjectTimer(id){
-  const subj = studySubjects.find(s=>s.id===id);
-  if(!subj) return;
- 
-  if(subj.running){
-    // Pause this subject
-    clearInterval(subj._interval);
-    subj._interval = null;
-    subj.running = false;
-    studyActiveId = null;
-  } else {
-    // Stop any currently running subject
-    studySubjects.forEach(s=>{
-      if(s.running){
-        clearInterval(s._interval);
-        s._interval = null;
-        s.running = false;
-      }
-    });
-    // Start this one
-    subj.running = true;
-    studyActiveId = id;
-    subj._interval = setInterval(()=>{
-      subj.seconds++;
-      saveStudyData();
-      updateStudyTotal();
-      // Update just this row's display
-      const el = document.getElementById(`stime-${id}`);
-      const row = document.getElementById(`srow-${id}`);
-      if(el) el.textContent = studyFmtTime(subj.seconds);
-      // Update progress bar (relative to max subject)
-      const maxSec = Math.max(...studySubjects.map(s=>s.seconds),1);
-      const pct = (subj.seconds/maxSec)*100;
-      const pb = document.getElementById(`sprog-${id}`);
-      if(pb) pb.style.width = pct+'%';
-    },1000);
-  }
-  renderStudySubjects();
-}
- 
-function resetSubjectTimer(id){
-  const subj = studySubjects.find(s=>s.id===id);
-  if(!subj) return;
-  if(subj.running){
-    clearInterval(subj._interval);
-    subj._interval = null;
-    subj.running = false;
-    if(studyActiveId===id) studyActiveId = null;
-  }
-  subj.seconds = 0;
-  saveStudyData();
-  updateStudyTotal();
-  renderStudySubjects();
-}
- 
-function deleteSubject(id){
-  const subj = studySubjects.find(s=>s.id===id);
-  if(subj && subj.running){ clearInterval(subj._interval); }
-  studySubjects = studySubjects.filter(s=>s.id!==id);
-  if(studyActiveId===id) studyActiveId=null;
-  saveStudyData();
-  renderStudySubjects();
-  document.getElementById('studyAddBtn').disabled = studySubjects.length >= 10;
-}
- 
-function renameSubject(id, newName){
-  const subj = studySubjects.find(s=>s.id===id);
-  if(subj){ subj.name = newName; saveStudyData(); }
-}
- 
-function resetAllStudy(){
-  if(!confirm('Reset all study timers to 0?')) return;
-  studySubjects.forEach(s=>{
-    if(s.running){ clearInterval(s._interval); s._interval=null; s.running=false; }
-    s.seconds=0;
-  });
-  studyActiveId=null;
-  saveStudyData();
-  updateStudyTotal();
-  renderStudySubjects();
-  toast('↺','All timers reset.','inf');
-}
- 
-function renderStudySubjects(){
-  const container = document.getElementById('studySubjects');
-  const empty = document.getElementById('studyEmpty');
-  const addBtn = document.getElementById('studyAddBtn');
-  if(!container) return;
- 
-  updateStudyTotal();
- 
-  if(studySubjects.length===0){
-    empty.style.display='block';
-    addBtn.disabled = false;
-    return;
-  }
-  empty.style.display='none';
-  addBtn.disabled = studySubjects.length >= 10;
- 
-  const maxSec = Math.max(...studySubjects.map(s=>s.seconds),1);
- 
-  container.innerHTML = studySubjects.map(subj=>{
-    const pct = (subj.seconds/maxSec)*100;
-    const isRunning = subj.running;
-    return `
-    <div class="subject-row ${isRunning?'running':''}" id="srow-${subj.id}" style="--subject-color:${subj.color}">
-      <div class="subject-color-dot" style="background:${subj.color}"></div>
-      <div class="subject-name-wrap">
-        <input class="subject-name-input" value="${esc(subj.name)}"
-          placeholder="Subject name"
-          onchange="renameSubject(${subj.id}, this.value)"
-          title="Click to rename"
-        />
-        <div class="subject-edit-hint">Click name to rename</div>
-      </div>
-      <div class="subject-timer-display ${isRunning?'running-time':''}" id="stime-${subj.id}">${studyFmtTime(subj.seconds)}</div>
-      <div class="subject-controls">
-        <button class="sctrl-btn play-btn ${isRunning?'active':''}" onclick="toggleSubjectTimer(${subj.id})" title="${isRunning?'Pause':'Start'}">
-          ${isRunning?'⏸':'▶'}
-        </button>
-        <button class="sctrl-btn reset-sub" onclick="resetSubjectTimer(${subj.id})" title="Reset this subject">↺</button>
-        <button class="sctrl-btn del-sub" onclick="deleteSubject(${subj.id})" title="Remove subject">✕</button>
-      </div>
-      <div class="subject-progress-bar" style="position:absolute;bottom:0;left:3px;right:0">
-        <div class="subject-progress-fill" id="sprog-${subj.id}" style="width:${pct}%;background:${subj.color}"></div>
-      </div>
-    </div>`;
-  }).join('');
 }
  
 // ══════════════════════════════════════════════
