@@ -667,8 +667,10 @@ let editId=null,editDK=null;
 //  FIX 4: midnight auto-reset uses Date comparison.
 // ══════════════════════════════════════════════════════════
 const SCOLS=['#38c9a8','#e8a838','#a87de8','#e85c5c','#e8d038','#4a9eff','#ff7b54','#b5e853','#ff54c0','#54c8ff'];
-const STUDY_KEY=()=>'tb_study_v2_'+(CU_ID||'x');
-const STUDY_DATE_KEY=()=>'tb_sdate_'+(CU_ID||'x');
+// Keys set after CU_ID is confirmed — never use placeholder
+let _SK='', _SDK='';
+function _initStudyKeys(){ _SK='tb_study_v3_'+CU_ID; _SDK='tb_sdate_v3_'+CU_ID; }
+
 // intervalMap: id -> setInterval handle (never serialised)
 const imap=new Map();
 // subjects array: [{id,name,secs,color}]  — plain data only
@@ -676,26 +678,35 @@ let subjects=[];
 
 /* ── persistence ── */
 function studySave(){
-  localStorage.setItem(STUDY_KEY(),JSON.stringify(subjects.map(s=>({id:s.id,name:s.name,secs:s.secs,color:s.color}))));
-  localStorage.setItem(STUDY_DATE_KEY(),dKey(new Date()));
+  if(!_SK) return;
+  try{
+    localStorage.setItem(_SK, JSON.stringify(
+      subjects.map(s=>({id:s.id,name:s.name,secs:s.secs,color:s.color}))
+    ));
+    localStorage.setItem(_SDK, dKey(new Date()));
+  }catch(e){}
 }
 function studyLoad(){
-  const savedDate=localStorage.getItem(STUDY_DATE_KEY());
-  const today=dKey(new Date());
-  const raw=localStorage.getItem(STUDY_KEY());
-  if(raw){
-    const parsed=JSON.parse(raw);
-    if(savedDate&&savedDate!==today){
-      // new day — keep subjects but reset secs
-      subjects=parsed.map(s=>({id:s.id,name:s.name,secs:0,color:s.color}));
+  if(!_SK) return;
+  try{
+    const savedDate=localStorage.getItem(_SDK);
+    const today=dKey(new Date());
+    const raw=localStorage.getItem(_SK);
+    if(raw){
+      const parsed=JSON.parse(raw);
+      const isNewDay=savedDate && savedDate!==today;
+      subjects=parsed.map(s=>({
+        id:s.id,
+        name:s.name||'Subject',
+        secs:isNewDay?0:(s.secs||0),
+        color:s.color||'#38c9a8'
+      }));
     } else {
-      subjects=parsed.map(s=>({id:s.id,name:s.name,secs:s.secs||0,color:s.color}));
+      subjects=[];
     }
-  } else {
-    subjects=[];
-  }
+  }catch(e){ subjects=[]; }
   imap.clear();
-  studySave(); // stamp today's date
+  studySave(); // stamp today
 }
 
 /* ── total ── */
@@ -1018,7 +1029,8 @@ async function launchApp(){
   document.getElementById('greet').textContent=CU.split(' ')[0];
   const de=document.getElementById('t-date');if(de)de.value=tKey();
   viewDate=new Date();tFilter='all';
-  // Load study data for this user
+  // Init study storage keys for this specific user, then load
+  _initStudyKeys();
   studyLoad();
   renderStudyList();
   showPage('tasks',document.querySelector('[data-p=tasks]'));
