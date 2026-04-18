@@ -368,6 +368,110 @@ select.m-in{appearance:none;cursor:pointer}
 .load-spinner{width:36px;height:36px;border:3px solid var(--s3);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .load-msg{font-size:.83rem;color:var(--text2)}
+
+/* ══ HAMBURGER + SIDE DRAWER ══ */
+.hamburger{display:flex;flex-direction:column;justify-content:center;gap:5px;width:36px;height:36px;cursor:pointer;border:none;background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:8px;transition:all .2s;flex-shrink:0}
+.hamburger:hover{border-color:var(--accent);background:rgba(232,168,56,.08)}
+.ham-line{height:2px;border-radius:2px;background:var(--text2);transition:all .3s}
+.hamburger:hover .ham-line{background:var(--accent)}
+.hamburger.open .ham-line:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.hamburger.open .ham-line:nth-child(2){opacity:0;transform:scaleX(0)}
+.hamburger.open .ham-line:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+
+.drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0);z-index:150;pointer-events:none;transition:background .3s}
+.drawer-overlay.open{background:rgba(0,0,0,.6);pointer-events:all}
+
+.drawer{position:fixed;top:0;left:-320px;bottom:0;width:300px;background:var(--s1);z-index:160;transition:left .32s cubic-bezier(.16,1,.3,1);display:flex;flex-direction:column;border-right:1px solid var(--border);box-shadow:8px 0 40px rgba(0,0,0,.4)}
+.drawer.open{left:0}
+
+.drawer-header{padding:22px 22px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0}
+.drawer-logo{font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:900;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.drawer-close{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.drawer-close:hover{background:var(--accent3);border-color:var(--accent3);color:#fff}
+
+.drawer-user{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0}
+.drawer-av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-weight:900;font-size:1.1rem;color:#050a08;flex-shrink:0}
+.drawer-username{font-weight:700;font-size:.95rem}
+.drawer-subtitle{font-size:.73rem;color:var(--text2);margin-top:2px}
+
+.drawer-nav{flex:1;overflow-y:auto;padding:10px 12px}
+.drawer-nav-item{display:flex;align-items:center;gap:13px;padding:12px 14px;border-radius:11px;cursor:pointer;transition:all .2s;color:var(--text2);font-family:'Plus Jakarta Sans',sans-serif;font-size:.9rem;font-weight:600;margin-bottom:3px;border:1px solid transparent}
+.drawer-nav-item:hover{background:rgba(232,168,56,.06);color:var(--text);border-color:rgba(232,168,56,.12)}
+.drawer-nav-item.active{background:rgba(232,168,56,.1);color:var(--accent);border-color:rgba(232,168,56,.2)}
+.drawer-nav-icon{font-size:1.1rem;width:24px;text-align:center;flex-shrink:0}
+.drawer-nav-label{flex:1}
+.drawer-nav-badge{background:var(--accent);color:#050a08;border-radius:50px;font-size:.65rem;font-weight:800;padding:2px 8px;min-width:20px;text-align:center}
+
+.drawer-section-label{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);padding:10px 14px 6px;margin-top:6px}
+
+.drawer-footer{padding:16px 22px;border-top:1px solid var(--border);flex-shrink:0}
+.drawer-logout-btn{width:100%;padding:11px;background:transparent;border:1.5px solid rgba(232,92,92,.3);color:var(--accent3);border-radius:10px;font-family:'Plus Jakarta Sans',sans-serif;font-size:.875rem;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px}
+.drawer-logout-btn:hover{background:rgba(232,92,92,.1);border-color:var(--accent3)}
+.drawer-credit{text-align:center;margin-top:12px;font-size:.72rem;color:var(--text3);font-family:'Plus Jakarta Sans',sans-serif;line-height:1.5}
+.drawer-credit strong{color:var(--text2)}
+
+/* Hide old nav-tabs, show only in desktop optionally */
+.nav-tabs{display:none!important}
+
+/* ══ INSIGHTS PAGE ══ */
+.ins-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px}
+.ins-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:22px;position:relative;overflow:hidden}
+.ins-card.full{grid-column:1/-1}
+.ins-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(56,201,168,.4),transparent)}
+.ins-card-title{font-family:'Playfair Display',serif;font-size:1rem;font-weight:700;margin-bottom:3px}
+.ins-card-sub{font-size:.76rem;color:var(--text2);margin-bottom:18px}
+
+/* Total study hero */
+.ins-hero{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+.ins-hero-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:20px;text-align:center;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s}
+.ins-hero-card:hover{transform:translateY(-3px);box-shadow:0 12px 36px rgba(0,0,0,.4)}
+.ins-hero-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2.5px}
+.ins-hero-card.today::before{background:var(--accent2)}
+.ins-hero-card.week::before{background:var(--accent)}
+.ins-hero-card.month::before{background:var(--accent4)}
+.ins-hero-icon{font-size:1.5rem;margin-bottom:10px}
+.ins-hero-time{font-family:'Playfair Display',serif;font-size:1.9rem;font-weight:900;line-height:1;margin-bottom:4px}
+.ins-hero-time.c-today{color:var(--accent2)}
+.ins-hero-time.c-week{color:var(--accent)}
+.ins-hero-time.c-month{color:var(--accent4)}
+.ins-hero-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3)}
+
+/* Subject breakdown rows */
+.subj-ins-row{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--s2);border-radius:10px;margin-bottom:8px;transition:transform .15s}
+.subj-ins-row:hover{transform:translateX(4px)}
+.subj-ins-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.subj-ins-name{flex:1;font-size:.88rem;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.subj-ins-times{display:flex;gap:10px;flex-shrink:0}
+.subj-ins-chip{font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:50px;background:var(--s3);color:var(--text2)}
+.subj-ins-chip.highlight{background:rgba(56,201,168,.15);color:var(--accent2)}
+
+/* Bar chart for daily breakdown */
+.ins-bar-grid{display:flex;flex-direction:column;gap:9px}
+.ins-bar-row{display:flex;align-items:center;gap:10px}
+.ins-bar-label{font-size:.76rem;font-weight:600;color:var(--text2);min-width:65px;text-align:right;flex-shrink:0}
+.ins-bar-track{flex:1;height:8px;background:var(--s2);border-radius:4px;overflow:hidden}
+.ins-bar-fill{height:100%;border-radius:4px;transition:width .9s cubic-bezier(.16,1,.3,1)}
+.ins-bar-val{font-size:.72rem;font-weight:700;color:var(--text2);min-width:44px;flex-shrink:0}
+
+/* Weekly heatmap for study */
+.study-week-grid{display:flex;gap:6px;align-items:flex-end;height:100px;margin-top:4px}
+.swg-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.swg-bar-wrap{flex:1;display:flex;align-items:flex-end;width:100%}
+.swg-bar{width:100%;border-radius:5px 5px 0 0;min-height:3px;transition:height .8s cubic-bezier(.16,1,.3,1);cursor:pointer;position:relative}
+.swg-bar:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--s3);color:var(--text);font-size:.68rem;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap;z-index:10;pointer-events:none}
+.swg-lbl{font-size:.63rem;color:var(--text3);font-weight:600}
+
+/* No data */
+.ins-empty{text-align:center;padding:32px;color:var(--text3);font-size:.85rem}
+.ins-empty-icon{font-size:2.5rem;margin-bottom:10px}
+
+@media(max-width:768px){
+  .ins-hero{grid-template-columns:1fr}
+  .ins-grid{grid-template-columns:1fr}
+  .ins-card.full{grid-column:1}
+  .drawer{width:280px}
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -409,15 +513,72 @@ select.m-in{appearance:none;cursor:pointer}
 
 <!-- APP -->
 <div id="app">
+  <!-- ═══ SIDE DRAWER ═══ -->
+  <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+  <div class="drawer" id="sideDrawer">
+    <div class="drawer-header">
+      <div class="drawer-logo">TaskBoard ✦</div>
+      <button class="drawer-close" onclick="closeDrawer()">✕</button>
+    </div>
+    <div class="drawer-user">
+      <div class="drawer-av" id="dAv">U</div>
+      <div>
+        <div class="drawer-username" id="dName">User</div>
+        <div class="drawer-subtitle">TaskBoard Member</div>
+      </div>
+    </div>
+    <div class="drawer-nav">
+      <div class="drawer-section-label">Navigation</div>
+      <div class="drawer-nav-item active" id="dnav-tasks" onclick="showPage('tasks',this);closeDrawer()">
+        <span class="drawer-nav-icon">📋</span><span class="drawer-nav-label">Tasks</span>
+      </div>
+      <div class="drawer-nav-item" id="dnav-calendar" onclick="showPage('calendar',this);closeDrawer()">
+        <span class="drawer-nav-icon">📅</span><span class="drawer-nav-label">Calendar</span>
+      </div>
+      <div class="drawer-nav-item" id="dnav-graphs" onclick="showPage('graphs',this);closeDrawer()">
+        <span class="drawer-nav-icon">📊</span><span class="drawer-nav-label">Graphs</span>
+      </div>
+      <div class="drawer-nav-item" id="dnav-analytics" onclick="showPage('analytics',this);closeDrawer()">
+        <span class="drawer-nav-icon">🔥</span><span class="drawer-nav-label">Analytics & Streak</span>
+      </div>
+      <div class="drawer-section-label">More</div>
+      <div class="drawer-nav-item" id="dnav-insights" onclick="showPage('insights',this);closeDrawer()">
+        <span class="drawer-nav-icon">💡</span><span class="drawer-nav-label">Insights</span>
+        <span class="drawer-nav-badge">New</span>
+      </div>
+      <div class="drawer-nav-item" id="dnav-profile" onclick="showPage('profile',this);closeDrawer()">
+        <span class="drawer-nav-icon">👤</span><span class="drawer-nav-label">Profile & Settings</span>
+      </div>
+      <div class="drawer-section-label">Tools</div>
+      <div class="drawer-nav-item" onclick="toggleTheme();closeDrawer()" id="themeDrawerItem">
+        <span class="drawer-nav-icon">🌙</span><span class="drawer-nav-label" id="themeDrawerLabel">Dark Mode</span>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button class="drawer-logout-btn" onclick="doLogout()">
+        <span>↩</span> Sign Out
+      </button>
+      <div class="drawer-credit">
+        Created with <span style="color:var(--accent3)">❤️</span> by <strong>Shreyansh</strong>
+      </div>
+    </div>
+  </div>
+
   <header>
-    <div class="hlogo">TaskBoard</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="hamburger" id="hamburgerBtn" onclick="toggleDrawer()">
+        <div class="ham-line"></div>
+        <div class="ham-line"></div>
+        <div class="ham-line"></div>
+      </button>
+      <div class="hlogo">TaskBoard</div>
+    </div>
     <div class="hright">
       <input class="hdr-search" id="gSearch" placeholder="🔍 Search tasks…" oninput="onSearch()" autocomplete="off"/>
       <button id="themeBtn" onclick="toggleTheme()" title="Toggle Theme" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0">🌙</button>
-      <div class="ubadge" onclick="showPage('profile',document.querySelector('[data-p=profile]'))">
+      <div class="ubadge" onclick="showPage('insights',document.getElementById('dnav-insights'));closeDrawer()">
         <div class="uav" id="hav">U</div><span class="uname" id="hun">User</span>
       </div>
-      <button class="lbtn" onclick="doLogout()">Log out</button>
     </div>
   </header>
   <div class="nav-tabs">
@@ -614,6 +775,94 @@ select.m-in{appearance:none;cursor:pointer}
     </div>
   </div>
 </div>
+
+  <!-- ═══ INSIGHTS PAGE ═══ -->
+  <div class="page" id="page-insights">
+    <div class="ph"><h1>Study <em>Insights</em> 💡</h1><p>Deep dive into your study patterns, time distribution, and subject-wise analysis.</p></div>
+
+    <!-- Hero stats -->
+    <div class="ins-hero">
+      <div class="ins-hero-card today">
+        <div class="ins-hero-icon">☀️</div>
+        <div class="ins-hero-time c-today" id="ins-today-time">0h 00m</div>
+        <div class="ins-hero-label">Today's Study</div>
+      </div>
+      <div class="ins-hero-card week">
+        <div class="ins-hero-icon">📅</div>
+        <div class="ins-hero-time c-week" id="ins-week-time">0h 00m</div>
+        <div class="ins-hero-label">This Week</div>
+      </div>
+      <div class="ins-hero-card month">
+        <div class="ins-hero-icon">🗓️</div>
+        <div class="ins-hero-time c-month" id="ins-month-time">0h 00m</div>
+        <div class="ins-hero-label">This Month</div>
+      </div>
+    </div>
+
+    <div class="ins-grid">
+      <!-- Subject breakdown -->
+      <div class="ins-card full">
+        <div class="ins-card-title">📚 Subject Breakdown — Today</div>
+        <div class="ins-card-sub">Time spent per subject with comparison to week average</div>
+        <div id="insSubjectList"><div class="ins-empty"><div class="ins-empty-icon">📖</div>No subjects tracked yet. Add subjects in the Study Timer!</div></div>
+      </div>
+
+      <!-- Daily chart this week -->
+      <div class="ins-card">
+        <div class="ins-card-title">📊 Daily Study — This Week</div>
+        <div class="ins-card-sub">Hours studied each day</div>
+        <div class="study-week-grid" id="insWeekChart"></div>
+        <div style="display:flex;justify-content:center;margin-top:8px;gap:12px;font-size:.72rem;color:var(--text2)">
+          <span>Mon → Sun</span>
+        </div>
+      </div>
+
+      <!-- Subject pie / distribution -->
+      <div class="ins-card">
+        <div class="ins-card-title">🎯 Focus Distribution</div>
+        <div class="ins-card-sub">Which subjects got the most attention today</div>
+        <div id="insFocusDist"></div>
+      </div>
+
+      <!-- Monthly heatmap -->
+      <div class="ins-card full">
+        <div class="ins-card-title">🔥 Monthly Study Heatmap</div>
+        <div class="ins-card-sub">Your study intensity across this month — darker = more hours</div>
+        <div id="insMonthHeatmap" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:.72rem;color:var(--text2)">
+          <span>Less</span>
+          <div style="width:12px;height:12px;border-radius:3px;background:var(--s2)"></div>
+          <div style="width:12px;height:12px;border-radius:3px;background:rgba(56,201,168,.25)"></div>
+          <div style="width:12px;height:12px;border-radius:3px;background:rgba(56,201,168,.5)"></div>
+          <div style="width:12px;height:12px;border-radius:3px;background:rgba(56,201,168,.75)"></div>
+          <div style="width:12px;height:12px;border-radius:3px;background:var(--accent2)"></div>
+          <span>More</span>
+        </div>
+      </div>
+
+      <!-- Best streak & stats -->
+      <div class="ins-card">
+        <div class="ins-card-title">⚡ Quick Stats</div>
+        <div class="ins-card-sub">Your study performance summary</div>
+        <div id="insQuickStats"></div>
+      </div>
+
+      <!-- Top subject -->
+      <div class="ins-card">
+        <div class="ins-card-title">🏆 Top Subjects</div>
+        <div class="ins-card-sub">Most studied subjects overall today</div>
+        <div id="insTopSubjects"></div>
+      </div>
+    </div>
+
+    <!-- Footer credit -->
+    <div style="text-align:center;padding:32px 0 8px;border-top:1px solid var(--border);margin-top:20px">
+      <div style="font-size:.78rem;color:var(--text3);font-family:'Plus Jakarta Sans',sans-serif;line-height:1.8">
+        Made with <span style="color:var(--accent3);font-size:1rem">❤️</span> by <span style="color:var(--text2);font-weight:700">Shreyansh</span><br/>
+        <span style="font-size:.7rem;color:var(--text3)">TaskBoard — Daily Tracker · Stay consistent, stay focused.</span>
+      </div>
+    </div>
+  </div>
 
 <div class="modal-ov" id="modal" onclick="closeMod()">
   <button class="mcls" onclick="closeMod()">✕</button>
@@ -1001,7 +1250,8 @@ function doLogout(){
   imap.forEach(iv=>clearInterval(iv));imap.clear();
   clearInterval(pomIv);
   studySave();
-  delSes();CU=null;CU_ID=null;DB={};subjects=[];
+  saveStudyHistory(); // save final snapshot before logout
+  delSes();CU=null;CU_ID=null;DB={};subjects=[];_SK='';_SDK='';
   document.getElementById('app').classList.remove('visible');
   document.getElementById('auth').classList.add('visible');
   document.getElementById('li-n').value='';
@@ -1027,6 +1277,9 @@ async function launchApp(){
   document.getElementById('hun').textContent=CU;
   document.getElementById('hav').textContent=CU[0].toUpperCase();
   document.getElementById('greet').textContent=CU.split(' ')[0];
+  // Update drawer user info
+  const dAv=document.getElementById('dAv');if(dAv)dAv.textContent=CU[0].toUpperCase();
+  const dName=document.getElementById('dName');if(dName)dName.textContent=CU;
   const de=document.getElementById('t-date');if(de)de.value=tKey();
   viewDate=new Date();tFilter='all';
   // Init study storage keys for this specific user, then load
@@ -1082,11 +1335,13 @@ function showPage(p,btn){
   document.querySelectorAll('.ntab').forEach(x=>x.classList.remove('on'));
   const pg=document.getElementById('page-'+p);if(pg)pg.classList.add('on');
   if(btn)btn.classList.add('on');
+  _setDrawerActive(p);
   if(p==='tasks'){updateDateNav();render();}
   if(p==='graphs')buildGraphs();
   if(p==='calendar')renderCal();
   if(p==='analytics')renderAnalytics();
   if(p==='profile')renderProfile();
+  if(p==='insights'){ saveStudyHistory(); renderInsights(); }
 }
 
 // DATE NAV
@@ -1343,9 +1598,212 @@ function toggleTheme(){
   if(isDark){document.documentElement.style.setProperty('--bg','#050a08');document.documentElement.style.setProperty('--s1','#0c1410');document.documentElement.style.setProperty('--s2','#121c16');document.documentElement.style.setProperty('--s3','#192420');document.documentElement.style.setProperty('--text','#f0ede6');document.documentElement.style.setProperty('--text2','#8a9e94');document.documentElement.style.setProperty('--text3','#4a5e54');document.getElementById('themeBtn').textContent='☀️';}
   else{document.documentElement.style.setProperty('--bg','#f5f2eb');document.documentElement.style.setProperty('--s1','#ede9e0');document.documentElement.style.setProperty('--s2','#e2ddd3');document.documentElement.style.setProperty('--s3','#d4cec3');document.documentElement.style.setProperty('--text','#1a1a14');document.documentElement.style.setProperty('--text2','#5a5a4a');document.documentElement.style.setProperty('--text3','#8a8a74');document.getElementById('themeBtn').textContent='🌙';}
   localStorage.setItem('tb_theme',isDark?'dark':'light');
+  // Update drawer theme item
+  const tdi=document.getElementById('themeDrawerItem');
+  const tdl=document.getElementById('themeDrawerLabel');
+  if(tdi) tdi.querySelector('.drawer-nav-icon').textContent=isDark?'🌙':'☀️';
+  if(tdl) tdl.textContent=isDark?'Dark Mode':'Light Mode';
   toast(isDark?'🌙':'☀️',isDark?'Dark mode':'Light mode','inf');
 }
 (function(){if(localStorage.getItem('tb_theme')==='light'){isDark=true;setTimeout(toggleTheme,0);}})();
+
+// ══════════════════════════════════════
+//  DRAWER / HAMBURGER
+// ══════════════════════════════════════
+function toggleDrawer(){
+  const drawer=document.getElementById('sideDrawer');
+  const overlay=document.getElementById('drawerOverlay');
+  const btn=document.getElementById('hamburgerBtn');
+  const isOpen=drawer.classList.contains('open');
+  if(isOpen){ closeDrawer(); }
+  else {
+    drawer.classList.add('open');
+    overlay.classList.add('open');
+    btn.classList.add('open');
+    document.body.style.overflow='hidden';
+  }
+}
+function closeDrawer(){
+  document.getElementById('sideDrawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+  document.getElementById('hamburgerBtn').classList.remove('open');
+  document.body.style.overflow='';
+}
+
+// Update drawer active state
+function _setDrawerActive(page){
+  document.querySelectorAll('.drawer-nav-item').forEach(el=>el.classList.remove('active'));
+  const el=document.getElementById('dnav-'+page);
+  if(el) el.classList.add('active');
+}
+
+// ══════════════════════════════════════
+//  INSIGHTS
+// ══════════════════════════════════════
+function fmtInsTime(secs){
+  const h=Math.floor(secs/3600), m=Math.floor((secs%3600)/60);
+  if(h>0) return `${h}h ${String(m).padStart(2,'0')}m`;
+  return `${m}m`;
+}
+
+// Get study history from localStorage (we store daily snapshots)
+// Key: tb_study_hist_<CU_ID>  Value: {"YYYY-MM-DD": {subjectId: secs, ...}}
+function getStudyHistory(){
+  if(!CU_ID) return {};
+  try{
+    const raw=localStorage.getItem('tb_study_hist_'+CU_ID);
+    return raw?JSON.parse(raw):{};
+  }catch{return {};}
+}
+function saveStudyHistory(){
+  if(!CU_ID||!subjects.length) return;
+  const hist=getStudyHistory();
+  const today=dKey(new Date());
+  // Save today's snapshot: {subjectId: secs}
+  const snap={};
+  subjects.forEach(s=>{ if(s.secs>0) snap[s.id]={name:s.name,secs:s.secs,color:s.color}; });
+  if(Object.keys(snap).length>0) hist[today]=snap;
+  try{ localStorage.setItem('tb_study_hist_'+CU_ID, JSON.stringify(hist)); }catch{}
+}
+
+function renderInsights(){
+  const today=dKey(new Date());
+  const hist=getStudyHistory();
+
+  // ── Hero totals ──
+  const todaySnap=hist[today]||{};
+  const todaySecs=Object.values(todaySnap).reduce((a,v)=>a+(v.secs||0),0);
+
+  // Week: Mon–Sun containing today
+  let weekSecs=0;
+  const now=new Date();
+  for(let i=6;i>=0;i--){const d=new Date();d.setDate(now.getDate()-i);const ds=dKey(d);const snap=hist[ds]||{};weekSecs+=Object.values(snap).reduce((a,v)=>a+(v.secs||0),0);}
+
+  // Month
+  let monthSecs=0;
+  const ym=today.substring(0,7);
+  Object.keys(hist).filter(k=>k.startsWith(ym)).forEach(k=>{monthSecs+=Object.values(hist[k]).reduce((a,v)=>a+(v.secs||0),0);});
+
+  document.getElementById('ins-today-time').textContent=fmtInsTime(todaySecs)||'0m';
+  document.getElementById('ins-week-time').textContent=fmtInsTime(weekSecs)||'0m';
+  document.getElementById('ins-month-time').textContent=fmtInsTime(monthSecs)||'0m';
+
+  // ── Subject Breakdown ──
+  const subjList=document.getElementById('insSubjectList');
+  // Merge today's live subjects + history
+  const liveMap={};
+  subjects.forEach(s=>{ if(s.secs>0) liveMap[s.id]={name:s.name,secs:s.secs,color:s.color}; });
+  const todayMap={...todaySnap, ...liveMap}; // live overrides
+  const todaySubjects=Object.values(todayMap);
+
+  if(!todaySubjects.length){
+    subjList.innerHTML='<div class="ins-empty"><div class="ins-empty-icon">📖</div>No subjects tracked today. Start the Study Timer to track your sessions!</div>';
+  } else {
+    const maxSecs=Math.max(...todaySubjects.map(s=>s.secs),1);
+    subjList.innerHTML='<div class="ins-bar-grid">'+todaySubjects.map(s=>{
+      const pct=Math.round((s.secs/maxSecs)*100);
+      return `<div class="ins-bar-row">
+        <div class="ins-bar-label" style="color:${s.color}">${esc(s.name.length>10?s.name.substring(0,10)+'…':s.name)}</div>
+        <div class="ins-bar-track"><div class="ins-bar-fill" style="width:${pct}%;background:${s.color}"></div></div>
+        <div class="ins-bar-val">${fmtInsTime(s.secs)}</div>
+      </div>`;
+    }).join('')+'</div>';
+  }
+
+  // ── Week Chart ──
+  const weekChart=document.getElementById('insWeekChart');
+  const weekDays=[];
+  for(let i=6;i>=0;i--){const d=new Date();d.setDate(now.getDate()-i);weekDays.push({ds:dKey(d),label:d.toLocaleDateString('en-IN',{weekday:'short'})});}
+  const weekSecsArr=weekDays.map(d=>{const snap=hist[d.ds]||{};return Object.values(snap).reduce((a,v)=>a+(v.secs||0),0);});
+  const maxWeekSecs=Math.max(...weekSecsArr,1);
+  weekChart.innerHTML=weekDays.map((d,i)=>{
+    const s=weekSecsArr[i];
+    const pct=Math.round((s/maxWeekSecs)*100);
+    const isToday=d.ds===today;
+    return `<div class="swg-col">
+      <div class="swg-bar-wrap">
+        <div class="swg-bar" style="height:${Math.max(pct,s>0?8:2)}%;background:${isToday?'var(--accent2)':'rgba(56,201,168,.35)'};width:100%;border-radius:5px 5px 0 0" data-tip="${d.label}: ${fmtInsTime(s)}"></div>
+      </div>
+      <div class="swg-lbl" style="color:${isToday?'var(--accent2)':'var(--text3)'}">${d.label}</div>
+    </div>`;
+  }).join('');
+
+  // ── Focus Distribution (simple bar) ──
+  const focusDist=document.getElementById('insFocusDist');
+  if(!todaySubjects.length){
+    focusDist.innerHTML='<div class="ins-empty" style="padding:20px"><div class="ins-empty-icon" style="font-size:1.8rem">📊</div>No data yet</div>';
+  } else {
+    const total=todaySubjects.reduce((a,s)=>a+s.secs,0)||1;
+    focusDist.innerHTML=todaySubjects.map(s=>{
+      const pct=Math.round((s.secs/total)*100);
+      return `<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:.8rem">
+          <span style="display:flex;align-items:center;gap:6px;font-weight:600"><span style="width:8px;height:8px;border-radius:50%;background:${s.color};display:inline-block"></span>${esc(s.name)}</span>
+          <span style="color:var(--text2)">${pct}%</span>
+        </div>
+        <div style="height:6px;background:var(--s2);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${s.color};border-radius:3px;transition:width .8s cubic-bezier(.16,1,.3,1)"></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Monthly Heatmap ──
+  const mhmap=document.getElementById('insMonthHeatmap');
+  const dm=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  const ms2=today.substring(0,7);
+  let mhHtml='';
+  for(let day=1;day<=dm;day++){
+    const ds=ms2+'-'+String(day).padStart(2,'0');
+    const snap=hist[ds]||{};
+    const secs=Object.values(snap).reduce((a,v)=>a+(v.secs||0),0);
+    const hrs=secs/3600;
+    const al=hrs===0?.05:hrs<0.5?.2:hrs<1?.4:hrs<2?.65:hrs<3?.85:1;
+    const isT=ds===today;
+    const label=new Date(ds+'T12:00').toLocaleDateString('en-IN',{month:'short',day:'numeric'});
+    mhHtml+=`<div title="${label}: ${fmtInsTime(secs)}" style="width:28px;height:28px;border-radius:6px;background:rgba(56,201,168,${al});display:flex;align-items:center;justify-content:center;font-size:.67rem;color:${secs>0?'rgba(255,255,255,.85)':'var(--text3)'};border:${isT?'1.5px solid var(--accent2)':'1px solid transparent'};cursor:default">${day}</div>`;
+  }
+  mhmap.innerHTML=mhHtml||'<div style="color:var(--text3);font-size:.85rem">No data this month yet.</div>';
+
+  // ── Quick Stats ──
+  const qStats=document.getElementById('insQuickStats');
+  // Best day
+  let bestDaySecs=0, bestDayLabel='—';
+  Object.keys(hist).filter(k=>k.startsWith(ym)).forEach(k=>{
+    const s=Object.values(hist[k]).reduce((a,v)=>a+(v.secs||0),0);
+    if(s>bestDaySecs){bestDaySecs=s;bestDayLabel=new Date(k+'T12:00').toLocaleDateString('en-IN',{month:'short',day:'numeric'});}
+  });
+  const avgDailyThisMonth=monthSecs/Math.max(now.getDate(),1);
+  const statRows=[
+    ['📅','Best Day This Month',bestDaySecs>0?`${bestDayLabel} · ${fmtInsTime(bestDaySecs)}`:'—'],
+    ['📈','Avg Daily (Month)',fmtInsTime(Math.round(avgDailyThisMonth))],
+    ['⚡','Subjects Tracked',subjects.length+''],
+    ['⏱','Longest Session Today',todaySubjects.length?fmtInsTime(Math.max(...todaySubjects.map(s=>s.secs))):'—'],
+  ];
+  qStats.innerHTML=statRows.map(([icon,label,val])=>
+    `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s2);border-radius:9px;margin-bottom:7px">
+      <span style="font-size:1rem;flex-shrink:0">${icon}</span>
+      <span style="flex:1;font-size:.83rem;color:var(--text2)">${label}</span>
+      <span style="font-size:.83rem;font-weight:700;color:var(--text)">${val}</span>
+    </div>`
+  ).join('');
+
+  // ── Top Subjects ──
+  const topSubj=document.getElementById('insTopSubjects');
+  const sorted=[...todaySubjects].sort((a,b)=>b.secs-a.secs);
+  if(!sorted.length){
+    topSubj.innerHTML='<div class="ins-empty" style="padding:16px"><div class="ins-empty-icon" style="font-size:1.8rem">🏆</div>No subjects yet</div>';
+  } else {
+    topSubj.innerHTML=sorted.map((s,i)=>`
+      <div class="subj-ins-row">
+        <span style="font-family:'Playfair Display',serif;font-weight:900;font-size:1rem;color:${i===0?'var(--accent)':i===1?'var(--text2)':'var(--text3)'};min-width:20px">${i+1}</span>
+        <div class="subj-ins-dot" style="background:${s.color}"></div>
+        <div class="subj-ins-name">${esc(s.name)}</div>
+        <div class="subj-ins-chip highlight">${fmtInsTime(s.secs)}</div>
+      </div>`
+    ).join('');
+  }
+}
 
 // TOAST
 let _tt;
@@ -1354,7 +1812,18 @@ function toast(ico,msg,type='suc'){document.getElementById('t-ico').textContent=
 window.addEventListener('resize',()=>{if(document.getElementById('page-graphs').classList.contains('on'))buildGraphs();});
 
 // Auto-save study every 30s if any timer running
-setInterval(()=>{if(imap.size>0)studySave();},30000);
+setInterval(()=>{
+  if(imap.size>0){
+    studySave();
+    saveStudyHistory(); // also snapshot for insights history
+  }
+},30000);
+
+// Save history on page unload
+window.addEventListener('beforeunload',()=>{ studySave(); saveStudyHistory(); });
+
+// ESC to close drawer
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeDrawer(); });
 </script>
 </body>
 </html>
