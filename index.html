@@ -413,26 +413,6 @@ select.m-in{appearance:none;cursor:pointer}
 /* Hide old nav-tabs, show only in desktop optionally */
 .nav-tabs{display:none!important}
 
-/* ══ XP BADGE ══ */
-.xp-badge{display:flex;align-items:center;gap:5px;background:linear-gradient(135deg,rgba(232,168,56,.18),rgba(232,208,56,.10));border:1.5px solid rgba(232,168,56,.35);border-radius:50px;padding:4px 10px 4px 7px;cursor:default;transition:all .3s;flex-shrink:0}
-.xp-badge:hover{border-color:var(--accent);background:rgba(232,168,56,.22)}
-.xp-icon{font-size:.9rem;line-height:1}
-.xp-val{font-family:'Playfair Display',serif;font-size:.88rem;font-weight:900;color:var(--accent);letter-spacing:.3px}
-.xp-label{font-size:.65rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em}
-/* XP pop animation */
-@keyframes xpPop{0%{transform:scale(1)}40%{transform:scale(1.22)}70%{transform:scale(.95)}100%{transform:scale(1)}}
-.xp-badge.pop{animation:xpPop .4s ease}
-/* Floating +XP indicator */
-.xp-float{position:fixed;bottom:70px;right:28px;background:var(--accent);color:#050a08;font-family:'Playfair Display',serif;font-weight:900;font-size:1rem;border-radius:50px;padding:6px 16px;z-index:2000;pointer-events:none;display:none;animation:xpFloat 1.4s ease forwards}
-@keyframes xpFloat{0%{opacity:0;transform:translateY(0) scale(.8)}15%{opacity:1;transform:translateY(-8px) scale(1.05)}80%{opacity:1;transform:translateY(-28px) scale(1)}100%{opacity:0;transform:translateY(-44px) scale(.9)}}
-
-/* ══ CHANGE NAME FORM ══ */
-.name-form{display:none;margin-top:10px}
-.name-form.open{display:block}
-.nf-row{display:flex;gap:8px;margin-bottom:8px}
-.nf-in{flex:1;padding:10px 13px;background:var(--s2);border:1.5px solid var(--border);border-radius:9px;color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;font-size:.88rem;outline:none;transition:border-color .2s}
-.nf-in:focus{border-color:var(--accent)}
-
 /* ══ INSIGHTS PAGE ══ */
 .ins-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px}
 .ins-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:22px;position:relative;overflow:hidden}
@@ -544,7 +524,7 @@ select.m-in{appearance:none;cursor:pointer}
       <div class="drawer-av" id="dAv">U</div>
       <div>
         <div class="drawer-username" id="dName">User</div>
-        <div class="drawer-subtitle" id="dSubtitle">⚡ 0 XP</div>
+        <div class="drawer-subtitle">TaskBoard Member</div>
       </div>
     </div>
     <div class="drawer-nav">
@@ -595,21 +575,12 @@ select.m-in{appearance:none;cursor:pointer}
     </div>
     <div class="hright">
       <input class="hdr-search" id="gSearch" placeholder="🔍 Search tasks…" oninput="onSearch()" autocomplete="off"/>
-      <div class="xp-badge" id="xpBadge" title="Your XP Points&#10;Task done: +10 XP&#10;Pomodoro: +5 XP&#10;1hr Study: +5 XP">
-        <span class="xp-icon">⚡</span>
-        <div>
-          <div class="xp-val" id="xpVal">0</div>
-          <div class="xp-label">XP</div>
-        </div>
-      </div>
       <button id="themeBtn" onclick="toggleTheme()" title="Toggle Theme" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0">🌙</button>
       <div class="ubadge" onclick="showPage('insights',document.getElementById('dnav-insights'));closeDrawer()">
         <div class="uav" id="hav">U</div><span class="uname" id="hun">User</span>
       </div>
     </div>
   </header>
-  <!-- Floating XP gain indicator -->
-  <div class="xp-float" id="xpFloat"></div>
   <div class="nav-tabs">
     <button class="ntab on" data-p="tasks"     onclick="showPage('tasks',this)">📋 Tasks</button>
     <button class="ntab"    data-p="calendar"  onclick="showPage('calendar',this)">📅 Calendar</button>
@@ -784,15 +755,6 @@ select.m-in{appearance:none;cursor:pointer}
             <div class="pstat"><div class="pstat-val" id="pDone">0</div><div class="pstat-lbl">Done</div></div>
             <div class="pstat"><div class="pstat-val" id="pStrk">0🔥</div><div class="pstat-lbl">Streak</div></div>
             <div class="pstat"><div class="pstat-val" id="pStudy">0h</div><div class="pstat-lbl">Study hrs</div></div>
-            <div class="pstat" style="grid-column:1/-1"><div class="pstat-val" id="pXP" style="color:var(--accent)">0 ⚡</div><div class="pstat-lbl">Total XP</div></div>
-          </div>
-          <div class="sec-title">Change Name</div>
-          <button class="btn-sm" onclick="toggleNameForm()" style="width:100%;margin-bottom:8px">✏️ Change Display Name</button>
-          <div class="name-form" id="nameForm">
-            <div class="nf-row">
-              <input class="nf-in" id="nf-new" type="text" placeholder="New display name" maxlength="30"/>
-              <button class="btn-sm" onclick="changeName()">Save</button>
-            </div>
           </div>
           <div class="sec-title">Change Password</div>
           <button class="btn-sm" onclick="togglePwForm()" style="width:100%;margin-bottom:8px">🔑 Change Password</button>
@@ -939,57 +901,6 @@ let CU=null,CU_ID=null,DB={},viewDate=new Date(),tFilter='all';
 let calY=new Date().getFullYear(),calM=new Date().getMonth();
 let editId=null,editDK=null;
 
-// ══════════════════════════════════════
-//  XP SYSTEM
-//  Task done: +10 XP | Pomodoro: +5 XP | 1hr study: +5 XP
-// ══════════════════════════════════════
-let _xpKey='';
-let _xp=0;
-// Track study XP milestones (every 3600 seconds = 5 XP)
-let _studyXpCheckpoint=0; // total secs at last XP award
-
-function _initXP(){
-  _xpKey='tb_xp_'+CU;
-  try{ _xp=parseInt(localStorage.getItem(_xpKey)||'0')||0; }catch{ _xp=0; }
-  // Restore study checkpoint from storage
-  try{ _studyXpCheckpoint=parseInt(localStorage.getItem(_xpKey+'_scp')||'0')||0; }catch{ _studyXpCheckpoint=0; }
-  _renderXP();
-}
-function _saveXP(){ if(_xpKey){ localStorage.setItem(_xpKey,_xp); localStorage.setItem(_xpKey+'_scp',_studyXpCheckpoint); } }
-function _renderXP(){
-  document.getElementById('xpVal').textContent=_xp;
-  const ds=document.getElementById('dSubtitle');
-  if(ds) ds.textContent=`⚡ ${_xp} XP`;
-  const px=document.getElementById('pXP');
-  if(px) px.textContent=_xp+' ⚡';
-}
-function _awardXP(pts,label){
-  _xp+=pts;
-  _saveXP();
-  _renderXP();
-  // Pop animation on badge
-  const badge=document.getElementById('xpBadge');
-  badge.classList.remove('pop');
-  void badge.offsetWidth; // reflow
-  badge.classList.add('pop');
-  // Floating indicator
-  const fl=document.getElementById('xpFloat');
-  fl.textContent=`+${pts} XP ${label}`;
-  fl.style.display='block';
-  setTimeout(()=>fl.style.display='none',1500);
-}
-// Check if study hours crossed another hour threshold → award XP
-function _checkStudyXP(){
-  const totalSecs=subjects.reduce((a,s)=>a+s.secs,0);
-  const hoursEarned=Math.floor(totalSecs/3600);
-  const hoursCheckpointed=Math.floor(_studyXpCheckpoint/3600);
-  const newHours=hoursEarned-hoursCheckpointed;
-  if(newHours>0){
-    _studyXpCheckpoint=hoursEarned*3600;
-    _awardXP(newHours*5,'📚');
-  }
-}
-
 // ══════════════════════════════════════════════════════════
 //  STUDY TIMER  — COMPLETELY REWRITTEN, NO BUGS
 //
@@ -1005,9 +916,9 @@ function _checkStudyXP(){
 //  FIX 4: midnight auto-reset uses Date comparison.
 // ══════════════════════════════════════════════════════════
 const SCOLS=['#38c9a8','#e8a838','#a87de8','#e85c5c','#e8d038','#4a9eff','#ff7b54','#b5e853','#ff54c0','#54c8ff'];
-// Keys set after CU is confirmed — use username string (not UUID) for reliable storage
+// Keys set after CU_ID is confirmed — never use placeholder
 let _SK='', _SDK='';
-function _initStudyKeys(){ _SK='tb_study_v4_'+CU; _SDK='tb_sdate_v4_'+CU; }
+function _initStudyKeys(){ _SK='tb_study_v3_'+CU_ID; _SDK='tb_sdate_v3_'+CU_ID; }
 
 // intervalMap: id -> setInterval handle (never serialised)
 const imap=new Map();
@@ -1089,43 +1000,75 @@ function confirmAddSubject(){
   toast('📚','Subject added!','suc');
 }
 
+/* ── wall-clock start timestamps for each running subject ── */
+const startMap=new Map(); // id -> Date.now() when started
+
+/* ── sync all running timers to wall-clock time ── */
+function _syncRunningTimers(){
+  const now=Date.now();
+  startMap.forEach((startTs,id)=>{
+    const subj=subjects.find(s=>s.id===id);
+    if(!subj) return;
+    const elapsed=Math.floor((now-startTs)/1000);
+    subj.secs=subj._secsAtStart+elapsed;
+    const tel=document.getElementById('stm_'+id);
+    if(tel) tel.textContent=studyFmt(subj.secs);
+  });
+  if(startMap.size>0){
+    const maxSecs=Math.max(...subjects.map(s=>s.secs),1);
+    subjects.forEach(s=>{
+      const pb=document.getElementById('spb_'+s.id);
+      if(pb) pb.style.width=Math.round((s.secs/maxSecs)*100)+'%';
+    });
+    studyUpdateTotal();
+  }
+}
+
+/* ── single global tick interval ── */
+let _globalTick=null;
+function _ensureGlobalTick(){
+  if(_globalTick) return;
+  _globalTick=setInterval(_syncRunningTimers,1000);
+}
+function _stopGlobalTick(){
+  if(_globalTick){clearInterval(_globalTick);_globalTick=null;}
+}
+
+/* ── on tab visibility change, immediately resync so no drift ── */
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible' && startMap.size>0){
+    _syncRunningTimers();
+  }
+});
+
 /* ── toggle timer ── */
 function toggleSubjectTimer(id){
   const subj=subjects.find(s=>s.id===id);
   if(!subj) return;
-  const running=imap.has(id);
+  const running=startMap.has(id);
 
   if(running){
-    // PAUSE
-    clearInterval(imap.get(id));
-    imap.delete(id);
+    // PAUSE — commit elapsed time first
+    _syncRunningTimers();
+    startMap.delete(id);
+    // stop old interval ref (kept in imap for compat, now unused for ticking)
+    if(imap.has(id)){clearInterval(imap.get(id));imap.delete(id);}
+    if(startMap.size===0) _stopGlobalTick();
     _updateSubjCard(id,false);
   } else {
     // Stop any other running subject first
-    imap.forEach((iv,oid)=>{
-      clearInterval(iv);
-      imap.delete(oid);
-      _updateSubjCard(oid,false);
-    });
-    // START this one
-    const iv=setInterval(()=>{
-      subj.secs++;
-      // Update only the time display element — no re-render
-      const tel=document.getElementById('stm_'+id);
-      if(tel) tel.textContent=studyFmt(subj.secs);
-      // Update progress bar
-      const maxSecs=Math.max(...subjects.map(s=>s.secs),1);
-      subjects.forEach(s=>{
-        const pb=document.getElementById('spb_'+s.id);
-        if(pb) pb.style.width=Math.round((s.secs/maxSecs)*100)+'%';
+    if(startMap.size>0){
+      _syncRunningTimers();
+      startMap.forEach((_,oid)=>{
+        if(imap.has(oid)){clearInterval(imap.get(oid));imap.delete(oid);}
+        _updateSubjCard(oid,false);
       });
-      studyUpdateTotal();
-      // Save every 30s
-      if(subj.secs%30===0) studySave();
-      // Check study XP every 60s
-      if(subj.secs%60===0) _checkStudyXP();
-    },1000);
-    imap.set(id,iv);
+      startMap.clear();
+    }
+    // START this one — record wall-clock start & current secs baseline
+    subj._secsAtStart=subj.secs;
+    startMap.set(id,Date.now());
+    _ensureGlobalTick();
     _updateSubjCard(id,true);
   }
 }
@@ -1152,7 +1095,9 @@ function _updateSubjCard(id,running){
 
 /* ── reset one subject ── */
 function resetSubjectTimer(id){
+  if(startMap.has(id)){startMap.delete(id);}
   if(imap.has(id)){clearInterval(imap.get(id));imap.delete(id);}
+  if(startMap.size===0) _stopGlobalTick();
   const subj=subjects.find(s=>s.id===id);
   if(!subj) return;
   subj.secs=0;
@@ -1167,6 +1112,8 @@ function resetSubjectTimer(id){
 
 /* ── delete subject ── */
 function deleteSubject(id){
+  if(startMap.has(id)){startMap.delete(id);}
+  if(startMap.size===0) _stopGlobalTick();
   if(imap.has(id)){clearInterval(imap.get(id));imap.delete(id);}
   subjects=subjects.filter(s=>s.id!==id);
   studySave();
@@ -1190,6 +1137,9 @@ function renameSubject(id,val){
 /* ── reset all ── */
 function resetAllStudy(){
   if(!confirm('Reset all study timers to 0?')) return;
+  _syncRunningTimers();
+  startMap.clear();
+  _stopGlobalTick();
   imap.forEach(iv=>clearInterval(iv));
   imap.clear();
   subjects.forEach(s=>s.secs=0);
@@ -1279,7 +1229,6 @@ function pomTick(){
     const m=Math.floor(pomFocusSecs/60),h=Math.floor(m/60),r=m%60;
     document.getElementById('pomTotalFocus').textContent=h>0?`${h}h ${r}m`:`${m}m`;
     toast('🍅','Pomodoro complete! Great work! 🎉','suc');
-    _awardXP(5,'🍅');
   }
 }
 function resetPom(){
@@ -1339,6 +1288,9 @@ async function doLogin(){
   await launchApp();
 }
 function doLogout(){
+  _syncRunningTimers();
+  startMap.clear();
+  _stopGlobalTick();
   imap.forEach(iv=>clearInterval(iv));imap.clear();
   clearInterval(pomIv);
   studySave();
@@ -1374,9 +1326,7 @@ async function launchApp(){
   const dName=document.getElementById('dName');if(dName)dName.textContent=CU;
   const de=document.getElementById('t-date');if(de)de.value=tKey();
   viewDate=new Date();tFilter='all';
-  // Init XP for this user
-  _initXP();
-  // Init study storage keys for this specific user (uses CU username — reliable), then load
+  // Init study storage keys for this specific user, then load
   _initStudyKeys();
   studyLoad();
   renderStudyList();
@@ -1471,8 +1421,7 @@ async function toggleDone(id){
   const nd=!t.done;
   await supa.from('tasks').update({done:nd,done_at:nd?new Date().toISOString():null}).eq('id',id);
   t.done=nd;t.doneAt=nd?new Date().toISOString():null;
-  if(nd) _awardXP(10,'✅'); // +10 XP for completing a task
-  render();toast(nd?'🎉':'↩',nd?'Done! +10 XP':'Pending.','suc');
+  render();toast(nd?'🎉':'↩',nd?'Done!':'Pending.','suc');
 }
 async function togglePin(id){
   const dk=dKey(viewDate),tasks=getDay(dk),t=tasks.find(x=>x.id===id);
@@ -1540,44 +1489,6 @@ async function changePassword(){
   toast('✓','Password updated!','suc');
 }
 function togglePwForm(){document.getElementById('pwForm').classList.toggle('open');}
-function toggleNameForm(){document.getElementById('nameForm').classList.toggle('open');document.getElementById('nf-new').value=CU;}
-async function changeName(){
-  const newName=document.getElementById('nf-new').value.trim();
-  if(!newName){toast('⚠️','Enter a name!','err');return;}
-  if(newName===CU){toast('⚠️','Same as current name.','inf');return;}
-  if(newName.length<2){toast('⚠️','Name too short.','err');return;}
-  // Check if name taken
-  const {data:ex}=await supa.from('users').select('id').eq('name',newName).maybeSingle();
-  if(ex&&ex.id!==CU_ID){toast('⚠️','Name already taken!','err');return;}
-  await supa.from('users').update({name:newName}).eq('id',CU_ID);
-  // Update all local task owner refs
-  Object.values(DB).flat().forEach(t=>{ if(t.owner===CU) t.owner=newName; });
-  // Migrate XP key
-  const oldXP=_xp;
-  const oldScp=_studyXpCheckpoint;
-  if(_xpKey) localStorage.removeItem(_xpKey);
-  // Migrate study key
-  const oldStudyData=localStorage.getItem(_SK);
-  const oldStudyDate=localStorage.getItem(_SDK);
-  if(_SK) localStorage.removeItem(_SK);
-  if(_SDK) localStorage.removeItem(_SDK);
-  CU=newName;
-  setSes({id:CU_ID,name:CU});
-  // Re-init keys with new name
-  _xpKey='tb_xp_'+CU; _xp=oldXP; _studyXpCheckpoint=oldScp; _saveXP();
-  _SK='tb_study_v4_'+CU; _SDK='tb_sdate_v4_'+CU;
-  if(oldStudyData) localStorage.setItem(_SK,oldStudyData);
-  if(oldStudyDate) localStorage.setItem(_SDK,oldStudyDate);
-  // Update UI everywhere
-  document.getElementById('hun').textContent=CU;
-  document.getElementById('hav').textContent=CU[0].toUpperCase();
-  document.getElementById('greet').textContent=CU.split(' ')[0];
-  const dAv=document.getElementById('dAv');if(dAv)dAv.textContent=CU[0].toUpperCase();
-  const dName=document.getElementById('dName');if(dName)dName.textContent=CU;
-  document.getElementById('nameForm').classList.remove('open');
-  renderProfile();
-  toast('✓','Name changed to '+CU+'!','suc');
-}
 async function clearMyData(){
   if(!confirm('Delete ALL your tasks? Cannot be undone.'))return;
   await supa.from('tasks').delete().eq('user_id',CU_ID);
@@ -1708,7 +1619,6 @@ async function renderProfile(){
   const totalStudySecs=subjects.reduce((a,s)=>a+s.secs,0);
   document.getElementById('pStudy').textContent=Math.floor(totalStudySecs/3600)+'h';
   document.getElementById('pStrk').textContent=calcStreak()+'🔥';
-  const pxEl=document.getElementById('pXP');if(pxEl)pxEl.textContent=_xp+' ⚡';
   const done=all.filter(t=>t.done).length;const streak=calcStreak();
   const achs=[
     {e:'🌱',n:'First Task',d:'Add your first task',ok:all.length>=1},
@@ -1947,14 +1857,15 @@ window.addEventListener('resize',()=>{if(document.getElementById('page-graphs').
 
 // Auto-save study every 30s if any timer running
 setInterval(()=>{
-  if(imap.size>0){
+  if(startMap.size>0){
+    _syncRunningTimers();
     studySave();
-    saveStudyHistory(); // also snapshot for insights history
+    saveStudyHistory();
   }
 },30000);
 
 // Save history on page unload
-window.addEventListener('beforeunload',()=>{ studySave(); saveStudyHistory(); });
+window.addEventListener('beforeunload',()=>{ _syncRunningTimers(); studySave(); saveStudyHistory(); });
 
 // ESC to close drawer
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeDrawer(); });
