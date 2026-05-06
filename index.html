@@ -760,7 +760,6 @@ select.m-in{appearance:none;cursor:pointer}
           <button class="btn-sm" onclick="toggleNameForm()" style="width:100%;margin-bottom:8px">✏️ Change Name</button>
           <div class="pw-form" id="nameForm">
             <input class="pf-in" id="nm-new" type="text" placeholder="New display name" maxlength="40"/>
-            <input class="pf-in" id="nm-pass" type="password" placeholder="Confirm with password"/>
             <button class="btn-sm" onclick="changeName()">Update Name</button>
           </div>
           <div class="sec-title" style="margin-top:16px">Change Password</div>
@@ -1499,13 +1498,8 @@ function togglePwForm(){document.getElementById('pwForm').classList.toggle('open
 function toggleNameForm(){document.getElementById('nameForm').classList.toggle('open');}
 async function changeName(){
   const newName=document.getElementById('nm-new').value.trim();
-  const pass=document.getElementById('nm-pass').value;
   if(!newName){toast('⚠️','Enter a new name','err');return;}
   if(newName.length<2){toast('⚠️','Name too short','err');return;}
-  if(!pass){toast('⚠️','Enter your password to confirm','err');return;}
-  const passHash=await hashPass(pass);
-  const {data:u}=await supa.from('users').select('password_hash').eq('id',CU_ID).single();
-  if(!u||u.password_hash!==passHash){toast('⚠️','Wrong password','err');return;}
   const {data:ex}=await supa.from('users').select('id').eq('name',newName).neq('id',CU_ID).maybeSingle();
   if(ex){toast('⚠️','Name already taken','err');return;}
   const {error}=await supa.from('users').update({name:newName}).eq('id',CU_ID);
@@ -1520,7 +1514,6 @@ async function changeName(){
   const dName=document.getElementById('dName');if(dName)dName.textContent=CU;
   document.getElementById('nameForm').classList.remove('open');
   document.getElementById('nm-new').value='';
-  document.getElementById('nm-pass').value='';
   renderProfile();
   toast('✓','Name updated!','suc');
 }
