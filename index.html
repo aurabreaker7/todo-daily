@@ -1000,75 +1000,41 @@ function confirmAddSubject(){
   toast('📚','Subject added!','suc');
 }
 
-/* ── wall-clock start timestamps for each running subject ── */
-const startMap=new Map(); // id -> Date.now() when started
-
-/* ── sync all running timers to wall-clock time ── */
-function _syncRunningTimers(){
-  const now=Date.now();
-  startMap.forEach((startTs,id)=>{
-    const subj=subjects.find(s=>s.id===id);
-    if(!subj) return;
-    const elapsed=Math.floor((now-startTs)/1000);
-    subj.secs=subj._secsAtStart+elapsed;
-    const tel=document.getElementById('stm_'+id);
-    if(tel) tel.textContent=studyFmt(subj.secs);
-  });
-  if(startMap.size>0){
-    const maxSecs=Math.max(...subjects.map(s=>s.secs),1);
-    subjects.forEach(s=>{
-      const pb=document.getElementById('spb_'+s.id);
-      if(pb) pb.style.width=Math.round((s.secs/maxSecs)*100)+'%';
-    });
-    studyUpdateTotal();
-  }
-}
-
-/* ── single global tick interval ── */
-let _globalTick=null;
-function _ensureGlobalTick(){
-  if(_globalTick) return;
-  _globalTick=setInterval(_syncRunningTimers,1000);
-}
-function _stopGlobalTick(){
-  if(_globalTick){clearInterval(_globalTick);_globalTick=null;}
-}
-
-/* ── on tab visibility change, immediately resync so no drift ── */
-document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible' && startMap.size>0){
-    _syncRunningTimers();
-  }
-});
-
 /* ── toggle timer ── */
 function toggleSubjectTimer(id){
   const subj=subjects.find(s=>s.id===id);
   if(!subj) return;
-  const running=startMap.has(id);
+  const running=imap.has(id);
 
   if(running){
-    // PAUSE — commit elapsed time first
-    _syncRunningTimers();
-    startMap.delete(id);
-    // stop old interval ref (kept in imap for compat, now unused for ticking)
-    if(imap.has(id)){clearInterval(imap.get(id));imap.delete(id);}
-    if(startMap.size===0) _stopGlobalTick();
+    // PAUSE
+    clearInterval(imap.get(id));
+    imap.delete(id);
     _updateSubjCard(id,false);
   } else {
     // Stop any other running subject first
-    if(startMap.size>0){
-      _syncRunningTimers();
-      startMap.forEach((_,oid)=>{
-        if(imap.has(oid)){clearInterval(imap.get(oid));imap.delete(oid);}
-        _updateSubjCard(oid,false);
+    imap.forEach((iv,oid)=>{
+      clearInterval(iv);
+      imap.delete(oid);
+      _updateSubjCard(oid,false);
+    });
+    // START this one
+    const iv=setInterval(()=>{
+      subj.secs++;
+      // Update only the time display element — no re-render
+      const tel=document.getElementById('stm_'+id);
+      if(tel) tel.textContent=studyFmt(subj.secs);
+      // Update progress bar
+      const maxSecs=Math.max(...subjects.map(s=>s.secs),1);
+      subjects.forEach(s=>{
+        const pb=document.getElementById('spb_'+s.id);
+        if(pb) pb.style.width=Math.round((s.secs/maxSecs)*100)+'%';
       });
-      startMap.clear();
-    }
-    // START this one — record wall-clock start & current secs baseline
-    subj._secsAtStart=subj.secs;
-    startMap.set(id,Date.now());
-    _ensureGlobalTick();
+      studyUpdateTotal();
+      // Save every 30s
+      if(subj.secs%30===0) studySave();
+    },1000);
+    imap.set(id,iv);
     _updateSubjCard(id,true);
   }
 }
@@ -1095,9 +1061,7 @@ function _updateSubjCard(id,running){
 
 /* ── reset one subject ── */
 function resetSubjectTimer(id){
-  if(startMap.has(id)){startMap.delete(id);}
   if(imap.has(id)){clearInterval(imap.get(id));imap.delete(id);}
-  if(startMap.size===0) _stopGlobalTick();
   const subj=subjects.find(s=>s.id===id);
   if(!subj) return;
   subj.secs=0;
@@ -1112,8 +1076,6 @@ function resetSubjectTimer(id){
 
 /* ── delete subject ── */
 function deleteSubject(id){
-  if(startMap.has(id)){startMap.delete(id);}
-  if(startMap.size===0) _stopGlobalTick();
   if(imap.has(id)){clearInterval(imap.get(id));imap.delete(id);}
   subjects=subjects.filter(s=>s.id!==id);
   studySave();
@@ -1137,9 +1099,6 @@ function renameSubject(id,val){
 /* ── reset all ── */
 function resetAllStudy(){
   if(!confirm('Reset all study timers to 0?')) return;
-  _syncRunningTimers();
-  startMap.clear();
-  _stopGlobalTick();
   imap.forEach(iv=>clearInterval(iv));
   imap.clear();
   subjects.forEach(s=>s.secs=0);
@@ -1288,9 +1247,6 @@ async function doLogin(){
   await launchApp();
 }
 function doLogout(){
-  _syncRunningTimers();
-  startMap.clear();
-  _stopGlobalTick();
   imap.forEach(iv=>clearInterval(iv));imap.clear();
   clearInterval(pomIv);
   studySave();
@@ -1857,15 +1813,14 @@ window.addEventListener('resize',()=>{if(document.getElementById('page-graphs').
 
 // Auto-save study every 30s if any timer running
 setInterval(()=>{
-  if(startMap.size>0){
-    _syncRunningTimers();
+  if(imap.size>0){
     studySave();
-    saveStudyHistory();
+    saveStudyHistory(); // also snapshot for insights history
   }
 },30000);
 
 // Save history on page unload
-window.addEventListener('beforeunload',()=>{ _syncRunningTimers(); studySave(); saveStudyHistory(); });
+window.addEventListener('beforeunload',()=>{ studySave(); saveStudyHistory(); });
 
 // ESC to close drawer
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeDrawer(); });
