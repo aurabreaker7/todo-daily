@@ -756,7 +756,14 @@ select.m-in{appearance:none;cursor:pointer}
             <div class="pstat"><div class="pstat-val" id="pStrk">0🔥</div><div class="pstat-lbl">Streak</div></div>
             <div class="pstat"><div class="pstat-val" id="pStudy">0h</div><div class="pstat-lbl">Study hrs</div></div>
           </div>
-          <div class="sec-title">Change Password</div>
+          <div class="sec-title">Change Name</div>
+          <button class="btn-sm" onclick="toggleNameForm()" style="width:100%;margin-bottom:8px">✏️ Change Name</button>
+          <div class="pw-form" id="nameForm">
+            <input class="pf-in" id="nm-new" type="text" placeholder="New display name" maxlength="40"/>
+            <input class="pf-in" id="nm-pass" type="password" placeholder="Confirm with password"/>
+            <button class="btn-sm" onclick="changeName()">Update Name</button>
+          </div>
+          <div class="sec-title" style="margin-top:16px">Change Password</div>
           <button class="btn-sm" onclick="togglePwForm()" style="width:100%;margin-bottom:8px">🔑 Change Password</button>
           <div class="pw-form" id="pwForm">
             <input class="pf-in" id="pw-old" type="password" placeholder="Current password"/>
@@ -1000,41 +1007,75 @@ function confirmAddSubject(){
   toast('📚','Subject added!','suc');
 }
 
+/* ── wall-clock start timestamps for each running subject ── */
+const startMap=new Map(); // id -> Date.now() when started
+
+/* ── sync all running timers to wall-clock time ── */
+function _syncRunningTimers(){
+  const now=Date.now();
+  startMap.forEach((startTs,id)=>{
+    const subj=subjects.find(s=>s.id===id);
+    if(!subj) return;
+    const elapsed=Math.floor((now-startTs)/1000);
+    subj.secs=subj._secsAtStart+elapsed;
+    const tel=document.getElementById('stm_'+id);
+    if(tel) tel.textContent=studyFmt(subj.secs);
+  });
+  if(startMap.size>0){
+    const maxSecs=Math.max(...subjects.map(s=>s.secs),1);
+    subjects.forEach(s=>{
+      const pb=document.getElementById('spb_'+s.id);
+      if(pb) pb.style.width=Math.round((s.secs/maxSecs)*100)+'%';
+    });
+    studyUpdateTotal();
+  }
+}
+
+/* ── single global tick interval ── */
+let _globalTick=null;
+function _ensureGlobalTick(){
+  if(_globalTick) return;
+  _globalTick=setInterval(_syncRunningTimers,1000);
+}
+function _stopGlobalTick(){
+  if(_globalTick){clearInterval(_globalTick);_globalTick=null;}
+}
+
+/* ── on tab visibility change, immediately resync so no drift ── */
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible' && startMap.size>0){
+    _syncRunningTimers();
+  }
+});
+
 /* ── toggle timer ── */
 function toggleSubjectTimer(id){
   const subj=subjects.find(s=>s.id===id);
   if(!subj) return;
-  const running=imap.has(id);
+  const running=startMap.has(id);
 
   if(running){
-    // PAUSE
-    clearInterval(imap.get(id));
-    imap.delete(id);
+    // PAUSE — commit elapsed time first
+    _syncRunningTimers();
+    startMap.delete(id);
+    // stop old interval ref (kept in imap for compat, now unused for ticking)
+    if(imap.has(id)){clearInterval(imap.get(id));imap.delete(id);}
+    if(startMap.size===0) _stopGlobalTick();
     _updateSubjCard(id,false);
   } else {
     // Stop any other running subject first
-    imap.forEach((iv,oid)=>{
-      clearInterval(iv);
-      imap.delete(oid);
-      _updateSubjCard(oid,false);
-    });
-    // START this one
-    const iv=setInterval(()=>{
-      subj.secs++;
-      // Update only the time display element — no re-render
-      const tel=document.getElementById('stm_'+id);
-      if(tel) tel.textContent=studyFmt(subj.secs);
-      // Update progress bar
-      const maxSecs=Math.max(...subjects.map(s=>s.secs),1);
-      subjects.forEach(s=>{
-        const pb=document.getElementById('spb_'+s.id);
-        if(pb) pb.style.width=Math.round((s.secs/maxSecs)*100)+'%';
+    if(startMap.size>0){
+      _syncRunningTimers();
+      startMap.forEach((_,oid)=>{
+        if(imap.has(oid)){clearInterval(imap.get(oid));imap.delete(oid);}
+        _updateSubjCard(oid,false);
       });
-      studyUpdateTotal();
-      // Save every 30s
-      if(subj.secs%30===0) studySave();
-    },1000);
-    imap.set(id,iv);
+      startMap.clear();
+    }
+    // START this one — record wall-clock start & current secs baseline
+    subj._secsAtStart=subj.secs;
+    startMap.set(id,Date.now());
+    _ensureGlobalTick();
     _updateSubjCard(id,true);
   }
 }
@@ -1061,7 +1102,9 @@ function _updateSubjCard(id,running){
 
 /* ── reset one subject ── */
 function resetSubjectTimer(id){
+  if(startMap.has(id)){startMap.delete(id);}
   if(imap.has(id)){clearInterval(imap.get(id));imap.delete(id);}
+  if(startMap.size===0) _stopGlobalTick();
   const subj=subjects.find(s=>s.id===id);
   if(!subj) return;
   subj.secs=0;
@@ -1076,6 +1119,8 @@ function resetSubjectTimer(id){
 
 /* ── delete subject ── */
 function deleteSubject(id){
+  if(startMap.has(id)){startMap.delete(id);}
+  if(startMap.size===0) _stopGlobalTick();
   if(imap.has(id)){clearInterval(imap.get(id));imap.delete(id);}
   subjects=subjects.filter(s=>s.id!==id);
   studySave();
@@ -1099,6 +1144,9 @@ function renameSubject(id,val){
 /* ── reset all ── */
 function resetAllStudy(){
   if(!confirm('Reset all study timers to 0?')) return;
+  _syncRunningTimers();
+  startMap.clear();
+  _stopGlobalTick();
   imap.forEach(iv=>clearInterval(iv));
   imap.clear();
   subjects.forEach(s=>s.secs=0);
@@ -1247,6 +1295,9 @@ async function doLogin(){
   await launchApp();
 }
 function doLogout(){
+  _syncRunningTimers();
+  startMap.clear();
+  _stopGlobalTick();
   imap.forEach(iv=>clearInterval(iv));imap.clear();
   clearInterval(pomIv);
   studySave();
@@ -1445,6 +1496,34 @@ async function changePassword(){
   toast('✓','Password updated!','suc');
 }
 function togglePwForm(){document.getElementById('pwForm').classList.toggle('open');}
+function toggleNameForm(){document.getElementById('nameForm').classList.toggle('open');}
+async function changeName(){
+  const newName=document.getElementById('nm-new').value.trim();
+  const pass=document.getElementById('nm-pass').value;
+  if(!newName){toast('⚠️','Enter a new name','err');return;}
+  if(newName.length<2){toast('⚠️','Name too short','err');return;}
+  if(!pass){toast('⚠️','Enter your password to confirm','err');return;}
+  const passHash=await hashPass(pass);
+  const {data:u}=await supa.from('users').select('password_hash').eq('id',CU_ID).single();
+  if(!u||u.password_hash!==passHash){toast('⚠️','Wrong password','err');return;}
+  const {data:ex}=await supa.from('users').select('id').eq('name',newName).neq('id',CU_ID).maybeSingle();
+  if(ex){toast('⚠️','Name already taken','err');return;}
+  const {error}=await supa.from('users').update({name:newName}).eq('id',CU_ID);
+  if(error){toast('⚠️','Update failed: '+error.message,'err');return;}
+  Object.values(DB).flat().forEach(t=>{if(t.owner===CU)t.owner=newName;});
+  CU=newName;
+  setSes({id:CU_ID,name:CU});
+  document.getElementById('hun').textContent=CU;
+  document.getElementById('hav').textContent=CU[0].toUpperCase();
+  document.getElementById('greet').textContent=CU.split(' ')[0];
+  const dAv=document.getElementById('dAv');if(dAv)dAv.textContent=CU[0].toUpperCase();
+  const dName=document.getElementById('dName');if(dName)dName.textContent=CU;
+  document.getElementById('nameForm').classList.remove('open');
+  document.getElementById('nm-new').value='';
+  document.getElementById('nm-pass').value='';
+  renderProfile();
+  toast('✓','Name updated!','suc');
+}
 async function clearMyData(){
   if(!confirm('Delete ALL your tasks? Cannot be undone.'))return;
   await supa.from('tasks').delete().eq('user_id',CU_ID);
@@ -1813,14 +1892,15 @@ window.addEventListener('resize',()=>{if(document.getElementById('page-graphs').
 
 // Auto-save study every 30s if any timer running
 setInterval(()=>{
-  if(imap.size>0){
+  if(startMap.size>0){
+    _syncRunningTimers();
     studySave();
-    saveStudyHistory(); // also snapshot for insights history
+    saveStudyHistory();
   }
 },30000);
 
 // Save history on page unload
-window.addEventListener('beforeunload',()=>{ studySave(); saveStudyHistory(); });
+window.addEventListener('beforeunload',()=>{ _syncRunningTimers(); studySave(); saveStudyHistory(); });
 
 // ESC to close drawer
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeDrawer(); });
