@@ -244,7 +244,7 @@ async def telegram_start() -> RedirectResponse:
 
 
 @app.get("/api/auth/telegram/callback")
-async def telegram_callback(token: str) -> RedirectResponse:
+async def telegram_callback(token: str, request: Request) -> RedirectResponse:
     """Verify the bot-filled token, create/sign-in the Supabase user, redirect with session hash."""
     entry = pending_telegram_tokens.get(token)
     if not entry or not entry.get("verified"):
@@ -258,97 +258,103 @@ async def telegram_callback(token: str) -> RedirectResponse:
     telegram_username = entry.get("telegram_username") or ""
     pending_telegram_tokens.pop(token, None)
 
-    # Deterministic email & password for this Telegram account
     email = f"tg_{telegram_id}@telegram.local"
     password = hashlib.sha256(
         f"tg_{telegram_id}_{SUPABASE_SERVICE_ROLE_KEY}".encode()
     ).hexdigest()
+    redirect_to = str(request.url_for("index"))
 
-    # Try signing in first (user may already exist)
-    try:
-        session = await supabase_auth_request(
-            "POST",
-            "token?grant_type=password",
-            json={"email": email, "password": password},
+    admin_headers = {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "content-type": "application/json",
+    }
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        # 1. Ensure auth user exists (ignore duplicate / 422 errors)
+        await client.post(
+            f"{SUPABASE_URL}/auth/v1/admin/users",
+            headers=admin_headers,
+            json={
+                "email": email,
+                "password": password,
+                "email_confirm": True,
+                "user_metadata": {
+                    "name": display_name,
+                    "full_name": display_name,
+                    "telegram_username": telegram_username,
+                },
+            },
         )
-    except HTTPException:
-        # First time — create the auth user via Supabase Admin API
-        async with httpx.AsyncClient(timeout=20) as client:
-            create_resp = await client.post(
-                f"{SUPABASE_URL}/auth/v1/admin/users",
-                headers={
-                    "apikey": SUPABASE_SERVICE_ROLE_KEY,
-                    "authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
-                    "content-type": "application/json",
-                },
-                json={
-                    "email": email,
-                    "password": password,
-                    "email_confirm": True,
-                    "user_metadata": {
-                        "name": display_name,
-                        "full_name": display_name,
-                        "telegram_username": telegram_username,
-                    },
-                },
-            )
-        if create_resp.status_code >= 400:
+
+        # 2. Generate a magic link — gives a fresh, guaranteed-valid session
+        link_resp = await client.post(
+            f"{SUPABASE_URL}/auth/v1/admin/generate_link",
+            headers=admin_headers,
+            json={
+                "type": "magiclink",
+                "email": email,
+                "options": {"redirect_to": redirect_to},
+            },
+        )
+        if link_resp.status_code >= 400:
             raise HTTPException(
                 status_code=500,
-                detail="Failed to create Telegram account. Please try again.",
+                detail="Failed to generate login link. Please try again.",
             )
-        # Now sign in the newly created user
-        session = await supabase_auth_request(
-            "POST",
-            "token?grant_type=password",
-            json={"email": email, "password": password},
-        )
 
-    # Ensure a profile row exists and has Telegram info
-    auth_user_id = (session.get("user") or {}).get("id") or session.get("id")
+        link_data = link_resp.json()
+        action_link = (link_data.get("properties") or {}).get("action_link")
+        auth_user_id = link_data.get("id")
+        if not action_link:
+            raise HTTPException(status_code=500, detail="Login link generation failed.")
+
+        # 3. Follow the magic link server-side to get fresh session tokens
+        verify_resp = await client.get(action_link, follow_redirects=False)
+
+    # 4. Ensure profile row exists with Telegram info
     if auth_user_id:
-        existing = await sb.request(
-            "GET",
-            "users",
-            params={"auth_id": f"eq.{auth_user_id}", "select": "id", "limit": "1"},
-        )
-        if existing:
-            await sb.request(
-                "PATCH",
+        try:
+            existing = await sb.request(
+                "GET",
                 "users",
-                params={"auth_id": f"eq.{auth_user_id}"},
-                headers={"prefer": "return=minimal"},
-                json={
-                    "telegram_username": telegram_username,
-                    "telegram_chat_id": str(telegram_id),
-                },
+                params={"auth_id": f"eq.{auth_user_id}", "select": "id", "limit": "1"},
             )
-        else:
-            await sb.request(
-                "POST",
-                "users",
-                headers={"prefer": "return=minimal"},
-                json={
-                    "name": display_name,
-                    "email": email,
-                    "auth_id": auth_user_id,
-                    "telegram_username": telegram_username,
-                    "telegram_chat_id": str(telegram_id),
-                },
-            )
+            if existing:
+                await sb.request(
+                    "PATCH",
+                    "users",
+                    params={"auth_id": f"eq.{auth_user_id}"},
+                    headers={"prefer": "return=minimal"},
+                    json={
+                        "telegram_username": telegram_username,
+                        "telegram_chat_id": str(telegram_id),
+                    },
+                )
+            else:
+                await sb.request(
+                    "POST",
+                    "users",
+                    headers={"prefer": "return=minimal"},
+                    json={
+                        "name": display_name,
+                        "email": email,
+                        "auth_id": auth_user_id,
+                        "telegram_username": telegram_username,
+                        "telegram_chat_id": str(telegram_id),
+                    },
+                )
+        except Exception:
+            pass  # Profile update is best-effort; login still works
 
-    # Redirect with hash fragment — same pattern as Google OAuth
-    access_token = session.get("access_token", "")
-    refresh_token = session.get("refresh_token", "")
-    expires_in = session.get("expires_in", 3600)
-    token_type = session.get("token_type", "bearer")
-    redirect_hash = (
-        f"#access_token={access_token}"
-        f"&token_type={token_type}"
-        f"&expires_in={expires_in}"
-        f"&refresh_token={refresh_token}"
-    )
-    return RedirectResponse(f"/{redirect_hash}")
+    # 5. Extract session hash from the verify redirect and forward to frontend
+    location = verify_resp.headers.get("location", "")
+    if "#" in location:
+        session_fragment = location.split("#", 1)[1]
+        return RedirectResponse(f"/#{session_fragment}")
+
+    # Fallback: redirect user to action_link and let Supabase handle it
+    return RedirectResponse(action_link)
 
 
 @app.get("/api/auth/user")
