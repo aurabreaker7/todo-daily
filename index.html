@@ -544,18 +544,39 @@ select.m-in{appearance:none;cursor:pointer}
         <button class="tab" onclick="swTab('su')">Sign Up</button>
       </div>
       <div id="li-form">
-        <div class="fg"><label>Name</label><input id="li-n" type="text" placeholder="Your name" autocomplete="username"/></div>
+        <div class="fg"><label>Email</label><input id="li-e" type="email" placeholder="you@example.com" autocomplete="email"/></div>
         <div class="fg"><label>Password</label><input id="li-p" type="password" placeholder="Password" autocomplete="current-password"/></div>
         <button class="abtn" onclick="doLogin()">Sign In →</button>
         <div class="aerr" id="li-err"></div>
+        <div style="text-align:center;margin-top:14px"><a href="#" style="font-size:.78rem;color:var(--accent2)" onclick="swTab('mg');return false">Had an account before email login? Upgrade it here →</a></div>
       </div>
       <div id="su-form" style="display:none">
         <div class="fg"><label>Full Name</label><input id="su-n" type="text" placeholder="Your full name" autocomplete="username"/></div>
-        <div class="fg"><label>Password</label><input id="su-p" type="password" placeholder="Min 4 characters" autocomplete="new-password"/></div>
+        <div class="fg"><label>Email</label><input id="su-e" type="email" placeholder="you@example.com" autocomplete="email"/></div>
+        <div class="fg"><label>Password</label><input id="su-p" type="password" placeholder="Min 6 characters" autocomplete="new-password"/></div>
         <div class="fg"><label>Confirm</label><input id="su-p2" type="password" placeholder="Repeat password" autocomplete="new-password"/></div>
         <button class="abtn" onclick="doSignup()">Create Account →</button>
         <div class="aerr" id="su-err"></div>
         <div class="aok" id="su-ok"></div>
+      </div>
+      <!-- ONE-TIME MIGRATION: existing name+password accounts link to a real email login -->
+      <div id="mg-form" style="display:none">
+        <div id="mg-step1">
+          <div style="font-size:.8rem;color:var(--text2);margin-bottom:16px">Step 1 — confirm your old login</div>
+          <div class="fg"><label>Name</label><input id="mg-n" type="text" placeholder="Your old username" autocomplete="username"/></div>
+          <div class="fg"><label>Old Password</label><input id="mg-op" type="password" placeholder="Your old password" autocomplete="current-password"/></div>
+          <button class="abtn" onclick="mgVerify()">Continue →</button>
+          <div class="aerr" id="mg-err"></div>
+        </div>
+        <div id="mg-step2" style="display:none">
+          <div style="font-size:.8rem;color:var(--text2);margin-bottom:16px">Step 2 — set your email + a new password</div>
+          <div class="fg"><label>Email</label><input id="mg-e" type="email" placeholder="you@example.com" autocomplete="email"/></div>
+          <div class="fg"><label>New Password</label><input id="mg-np" type="password" placeholder="Min 6 characters" autocomplete="new-password"/></div>
+          <button class="abtn" onclick="mgFinish()">Upgrade Account →</button>
+          <div class="aerr" id="mg-err2"></div>
+          <div class="aok" id="mg-ok"></div>
+        </div>
+        <div style="text-align:center;margin-top:14px"><a href="#" style="font-size:.78rem;color:var(--text2)" onclick="swTab('li');return false">← Back to Sign In</a></div>
       </div>
     </div>
   </div>
@@ -1393,50 +1414,93 @@ function showLoader(msg){const el=document.getElementById('loading-screen');if(e
 // ══════════════════════════════════════
 //  AUTH
 // ══════════════════════════════════════
+// hashPass is kept ONLY to verify old name+password_hash accounts during
+// the one-time migration flow below — it is never used for the new login.
 async function hashPass(p){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(p));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
+
 async function doSignup(){
   const n=document.getElementById('su-n').value.trim();
+  const email=document.getElementById('su-e').value.trim();
   const p=document.getElementById('su-p').value;
   const p2=document.getElementById('su-p2').value;
   if(!n){showErr('su-err','Enter your name.');return;}
-  if(p.length<4){showErr('su-err','Password needs min 4 chars.');return;}
+  if(!email){showErr('su-err','Enter your email.');return;}
+  if(p.length<6){showErr('su-err','Password needs min 6 chars.');return;}
   if(p!==p2){showErr('su-err','Passwords do not match.');return;}
   showLoader('Creating account…');
-  const {data:ex}=await supa.from('users').select('id').eq('name',n).maybeSingle();
-  if(ex){hideLoader();showErr('su-err','Name already taken.');return;}
-  const hashed=await hashPass(p);
-  const {data:user,error}=await supa.from('users').insert({name:n,password_hash:hashed}).select().single();
-  if(error){hideLoader();showErr('su-err','Error: '+error.message);return;}
+  const {data:authData,error:authErr}=await supa.auth.signUp({email,password:p});
+  if(authErr){hideLoader();showErr('su-err','Error: '+authErr.message);return;}
+  if(!authData.session){
+    // Email confirmation is required by the project's Auth settings — profile
+    // row gets created on first successful login instead (see doLogin()).
+    hideLoader();
+    showOk('su-ok','✓ Check your email to confirm your account, then sign in.');
+    pendingProfileName=n; // used to create the profile row right after confirmation+first login
+    try{localStorage.setItem('tb_pending_name',n);}catch(e){}
+    return;
+  }
+  const {error:insErr}=await supa.from('users').insert({name:n,email,auth_id:authData.user.id});
   hideLoader();
+  if(insErr){
+    if(insErr.message&&insErr.message.toLowerCase().includes('duplicate')) showErr('su-err','That name is already taken — pick another.');
+    else showErr('su-err','Account created but profile setup failed: '+insErr.message);
+    return;
+  }
   showOk('su-ok','✓ Account created! Signing you in…');
-  setTimeout(()=>{document.getElementById('li-n').value=n;document.getElementById('li-p').value=p;doLogin();},800);
+  setTimeout(()=>launchApp(),600);
 }
+
 async function doLogin(){
-  const n=document.getElementById('li-n').value.trim();
+  const email=document.getElementById('li-e').value.trim();
   const p=document.getElementById('li-p').value;
-  if(!n||!p){showErr('li-err','Please fill in all fields.');return;}
+  if(!email||!p){showErr('li-err','Please fill in all fields.');return;}
   showLoader('Signing in…');
-  const hashed=await hashPass(p);
-  const {data:user,error}=await supa.from('users').select('*').eq('name',n).eq('password_hash',hashed).maybeSingle();
-  if(error||!user){hideLoader();showErr('li-err','Wrong name or password.');return;}
-  CU=user.name;CU_ID=user.id;
-  setSes({id:user.id,name:user.name});
+  const {data,error}=await supa.auth.signInWithPassword({email,password:p});
+  if(error||!data.session){hideLoader();showErr('li-err','Wrong email or password.');return;}
   await launchApp();
 }
+
 function doLogout(){
   imap.forEach(rec=>clearInterval(rec.handle));imap.clear();
   clearInterval(pomIv);
   studySave();
   saveStudyHistory(); // save final snapshot before logout
   syncStudyToCloud(true); // push final totals so the leaderboard reflects this session
-  delSes();CU=null;CU_ID=null;DB={};subjects=[];_SK='';_SDK='';
+  supa.auth.signOut();
+  CU=null;CU_ID=null;DB={};subjects=[];_SK='';_SDK='';
   document.getElementById('app').classList.remove('visible');
   document.getElementById('auth').classList.add('visible');
-  document.getElementById('li-n').value='';
+  document.getElementById('li-e').value='';
   document.getElementById('li-p').value='';
 }
+
+let pendingProfileName=null;
+/* fetch (or, for a just-confirmed signup, create) this auth user's `users` profile row */
+async function loadOrCreateProfile(authUser){
+  let {data:profile}=await supa.from('users').select('*').eq('auth_id',authUser.id).maybeSingle();
+  if(!profile){
+    const name=pendingProfileName||localStorage.getItem('tb_pending_name')||(authUser.email?authUser.email.split('@')[0]:'User');
+    const {data:created,error}=await supa.from('users').insert({name,email:authUser.email,auth_id:authUser.id}).select().single();
+    if(error){ toast('⚠️','Could not finish account setup: '+error.message,'err'); return null; }
+    profile=created;
+    try{localStorage.removeItem('tb_pending_name');}catch(e){}
+  }
+  return profile;
+}
+
 async function launchApp(){
   showLoader('Fetching your data…');
+  const {data:sessionData}=await supa.auth.getSession();
+  const authUser=sessionData?.session?.user;
+  if(!authUser){ hideLoader(); document.getElementById('auth').classList.add('visible'); return; }
+  const pendingClaimId=localStorage.getItem('tb_pending_claim_id');
+  if(pendingClaimId){
+    try{ await supa.rpc('claim_legacy_account',{p_legacy_id:pendingClaimId}); }catch(e){}
+    try{ localStorage.removeItem('tb_pending_claim_id'); }catch(e){}
+  }
+  const profile=await loadOrCreateProfile(authUser);
+  if(!profile){ hideLoader(); return; }
+  CU=profile.name; CU_ID=profile.id;
   try{
     const {data:tasks,error:te}=await supa.from('tasks').select('*').eq('user_id',CU_ID).order('created_at',{ascending:false});
     if(te) throw te;
@@ -1471,22 +1535,29 @@ async function launchApp(){
 // BOOT
 async function _boot(){
   showLoader('Checking session…');
-  const ses=getSes();
-  if(ses&&ses.id&&ses.name){
-    const {data:u}=await supa.from('users').select('id,name').eq('id',ses.id).maybeSingle();
-    if(u){CU=u.name;CU_ID=u.id;await launchApp();return;}
-    else delSes();
-  }
+  const {data}=await supa.auth.getSession();
+  if(data?.session?.user){ await launchApp(); return; }
   hideLoader();
   document.getElementById('auth').classList.add('visible');
   _setupKeys();
 }
+// Keep the app in sync if the Supabase session changes in another tab, expires, etc.
+supa.auth.onAuthStateChange((event)=>{
+  if(event==='SIGNED_OUT'&&document.getElementById('app').classList.contains('visible')){
+    doLogout();
+  }
+});
 function _setupKeys(){
-  document.getElementById('li-n')?.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+  document.getElementById('li-e')?.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
   document.getElementById('li-p')?.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
   document.getElementById('su-n')?.addEventListener('keydown',e=>{if(e.key==='Enter')doSignup();});
+  document.getElementById('su-e')?.addEventListener('keydown',e=>{if(e.key==='Enter')doSignup();});
   document.getElementById('su-p')?.addEventListener('keydown',e=>{if(e.key==='Enter')doSignup();});
   document.getElementById('su-p2')?.addEventListener('keydown',e=>{if(e.key==='Enter')doSignup();});
+  document.getElementById('mg-n')?.addEventListener('keydown',e=>{if(e.key==='Enter')mgVerify();});
+  document.getElementById('mg-op')?.addEventListener('keydown',e=>{if(e.key==='Enter')mgVerify();});
+  document.getElementById('mg-e')?.addEventListener('keydown',e=>{if(e.key==='Enter')mgFinish();});
+  document.getElementById('mg-np')?.addEventListener('keydown',e=>{if(e.key==='Enter')mgFinish();});
   document.getElementById('t-title')?.addEventListener('keydown',e=>{if(e.key==='Enter')addTask();});
   document.getElementById('studyNewName')?.addEventListener('keydown',e=>{
     if(e.key==='Enter')confirmAddSubject();
@@ -1496,11 +1567,56 @@ function _setupKeys(){
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',_boot);}else{_boot();}
 
 // ══════════════════════════════════════
+//  ONE-TIME LEGACY ACCOUNT MIGRATION
+//  (old name+password_hash accounts → real email login)
+// ══════════════════════════════════════
+let _mgLegacyId=null;
+async function mgVerify(){
+  const n=document.getElementById('mg-n').value.trim();
+  const op=document.getElementById('mg-op').value;
+  if(!n||!op){showErr('mg-err','Enter your old name and password.');return;}
+  showLoader('Checking your old account…');
+  const hashed=await hashPass(op);
+  const {data,error}=await supa.rpc('verify_legacy_login',{p_name:n,p_password_hash:hashed});
+  hideLoader();
+  if(error){showErr('mg-err','Error: '+error.message);return;}
+  const row=Array.isArray(data)?data[0]:data;
+  if(!row){showErr('mg-err','Wrong old name or password.');return;}
+  if(row.already_claimed){showErr('mg-err','This account is already upgraded — just sign in with its email.');return;}
+  _mgLegacyId=row.id;
+  document.getElementById('mg-step1').style.display='none';
+  document.getElementById('mg-step2').style.display='block';
+}
+async function mgFinish(){
+  const email=document.getElementById('mg-e').value.trim();
+  const np=document.getElementById('mg-np').value;
+  if(!email){showErr('mg-err2','Enter an email.');return;}
+  if(np.length<6){showErr('mg-err2','Password needs min 6 chars.');return;}
+  if(!_mgLegacyId){showErr('mg-err2','Something went wrong — please restart this step.');return;}
+  showLoader('Upgrading your account…');
+  const {data:authData,error:authErr}=await supa.auth.signUp({email,password:np});
+  if(authErr){hideLoader();showErr('mg-err2','Error: '+authErr.message);return;}
+  if(!authData.session){
+    hideLoader();
+    // No active session yet (email confirmation required) — finish the claim on first login instead
+    try{localStorage.setItem('tb_pending_claim_id',String(_mgLegacyId));}catch(e){}
+    showOk('mg-ok','✓ Check your email to confirm, then sign in to finish the upgrade.');
+    return;
+  }
+  const {error:claimErr}=await supa.rpc('claim_legacy_account',{p_legacy_id:_mgLegacyId});
+  hideLoader();
+  if(claimErr){showErr('mg-err2','Error linking account: '+claimErr.message);return;}
+  showOk('mg-ok','✓ Account upgraded! Signing you in…');
+  setTimeout(()=>launchApp(),600);
+}
+
+// ══════════════════════════════════════
 //  AUTH UI
 // ══════════════════════════════════════
 function swTab(t){
   document.getElementById('li-form').style.display=t==='li'?'block':'none';
   document.getElementById('su-form').style.display=t==='su'?'block':'none';
+  document.getElementById('mg-form').style.display=t==='mg'?'block':'none';
   document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('on',(t==='li'&&i===0)||(t==='su'&&i===1)));
 }
 function showErr(id,msg){const e=document.getElementById(id);e.textContent=msg;e.style.display='block';setTimeout(()=>e.style.display='none',4000);}
@@ -1614,12 +1730,16 @@ async function changePassword(){
   const old=document.getElementById('pw-old').value;
   const nw=document.getElementById('pw-new').value;
   const nw2=document.getElementById('pw-c').value;
-  if(nw.length<4){toast('⚠️','Min 4 characters','err');return;}
+  if(nw.length<6){toast('⚠️','Min 6 characters','err');return;}
   if(nw!==nw2){toast('⚠️','Passwords do not match','err');return;}
-  const oldHash=await hashPass(old);
-  const {data:u}=await supa.from('users').select('password_hash').eq('id',CU_ID).single();
-  if(!u||u.password_hash!==oldHash){toast('⚠️','Wrong current password','err');return;}
-  await supa.from('users').update({password_hash:await hashPass(nw)}).eq('id',CU_ID);
+  const {data:sessionData}=await supa.auth.getSession();
+  const email=sessionData?.session?.user?.email;
+  if(!email){toast('⚠️','Session expired — please sign in again','err');return;}
+  // Re-authenticate with the current password before allowing the change
+  const {error:reAuthErr}=await supa.auth.signInWithPassword({email,password:old});
+  if(reAuthErr){toast('⚠️','Wrong current password','err');return;}
+  const {error}=await supa.auth.updateUser({password:nw});
+  if(error){toast('⚠️','Error: '+error.message,'err');return;}
   document.getElementById('pwForm').classList.remove('open');
   ['pw-old','pw-new','pw-c'].forEach(id=>document.getElementById(id).value='');
   toast('✓','Password updated!','suc');
@@ -1829,7 +1949,7 @@ async function renderLeaderboard(){
   loading.style.display='block';loading.textContent='Loading rankings…';
   podiumEl.style.display='none';podiumEl.innerHTML='';tableEl.innerHTML='';
   try{
-    const {data:rows,error}=await supa.from('users')
+    const {data:rows,error}=await supa.from('leaderboard_view')
       .select('id,name,total_study_seconds,today_study_seconds,study_date')
       .order('total_study_seconds',{ascending:false})
       .limit(50);
