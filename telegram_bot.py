@@ -192,6 +192,25 @@ def parse_task_titles(raw: str) -> list[str]:
     return pieces[:MAX_TASKS_PER_MESSAGE]
 
 
+def safe_active_timer(active_timer: Any) -> dict[str, Any] | None:
+    """Validate a study_timer blob from the DB before trusting it.
+
+    Stale/legacy or partially-written timer JSON (e.g. missing
+    started_at) used to cause an uncaught TypeError deep in /stats and
+    /study, which python-telegram-bot's error handler then reported as a
+    generic "Something went wrong." This normalizes bad data into "no
+    active timer" instead of crashing.
+    """
+    if not isinstance(active_timer, dict):
+        return None
+    if not active_timer.get("subject_id"):
+        return None
+    started_at = active_timer.get("started_at")
+    if not isinstance(started_at, (int, float)):
+        return None
+    return active_timer
+
+
 def missing_link_column_message() -> str:
     return (
         "Telegram linking needs this Supabase column:\n\n"
@@ -292,8 +311,24 @@ async def require_linked_user(update: Update) -> dict[str, Any] | None:
     try:
         user = await sb.get_user_by_chat_id(chat_id)
     except SupabaseError as exc:
-        if "telegram_chat_id" in str(exc):
+        message = str(exc)
+        if "telegram_chat_id" in message:
             await update.effective_message.reply_text(missing_link_column_message(), parse_mode=ParseMode.HTML)
+            return None
+        # Any other Supabase failure here (e.g. a column referenced in the
+        # SELECT — like study_timer — not existing yet in the actual
+        # table) used to bubble up as a bare "Something went wrong."
+        # Surface the real reason so it's fixable without digging through
+        # Railway logs.
+        if "does not exist" in message.lower() or "column" in message.lower():
+            await update.effective_message.reply_text(
+                "⚠️ Supabase schema error while loading your profile:\n\n"
+                f"<code>{escape(message[:300])}</code>\n\n"
+                "This usually means a column the bot expects (e.g. study_timer) "
+                "hasn't been added to the `users` table yet. Run the pending "
+                "migration in the Supabase SQL editor, then try again.",
+                parse_mode=ParseMode.HTML,
+            )
             return None
         raise
     if not user:
@@ -385,10 +420,10 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     subjects = []
 
     # Get live timer info if exists to make stats precise
-    active_timer = user.get("study_timer")
+    active_timer = safe_active_timer(user.get("study_timer"))
     active_id = None
     elapsed = 0
-    if active_timer and active_timer.get("subject_id"):
+    if active_timer:
         active_id = active_timer.get("subject_id")
         elapsed = max(0, int(time.time() - active_timer.get("started_at")))
 
@@ -473,8 +508,8 @@ async def study(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     args = context.args
     if not args:
-        active_timer = user.get("study_timer")
-        if active_timer and active_timer.get("subject_id"):
+        active_timer = safe_active_timer(user.get("study_timer"))
+        if active_timer:
             subject_name = active_timer.get("subject_name") or "Subject"
             started_at = active_timer.get("started_at")
             elapsed = int(time.time() - started_at)
@@ -505,15 +540,24 @@ async def study(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     study_date = user.get("study_date")
     today_study_seconds = int(user.get("today_study_seconds") or 0)
     total_study_seconds = int(user.get("total_study_seconds") or 0)
-    active_timer = user.get("study_timer")
+    active_timer = safe_active_timer(user.get("study_timer"))
 
     # Handle day boundary reset if active
     if study_date and study_date != today_date:
         # Archive yesterday's subjects to study_history
+        # .get() with defaults: legacy/partial subject rows used to raise
+        # KeyError here (via s['id']/s['secs']) and crash the whole
+        # /study command with a generic error.
         subjects_dict = {}
         for s in study_subjects:
-            subjects_dict[str(s['id'])] = {"secs": s['secs'], "name": s['name'], "color": s.get('color', '#38c9a8')}
-        total_secs = sum(s['secs'] for s in study_subjects)
+            if not isinstance(s, dict) or s.get("id") is None:
+                continue
+            subjects_dict[str(s["id"])] = {
+                "secs": int(s.get("secs") or 0),
+                "name": s.get("name") or "Subject",
+                "color": s.get("color", "#38c9a8"),
+            }
+        total_secs = sum(int(s.get("secs") or 0) for s in study_subjects if isinstance(s, dict))
         if total_secs > 0:
             try:
                 await sb.request("POST", "study_history", json={
@@ -528,7 +572,8 @@ async def study(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         
         # Reset subjects secs for the new day
         for s in study_subjects:
-            s['secs'] = 0
+            if isinstance(s, dict):
+                s['secs'] = 0
         today_study_seconds = 0
         study_date = today_date
 
