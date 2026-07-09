@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import httpx
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
 
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
@@ -200,6 +200,93 @@ def missing_link_column_message() -> str:
     )
 
 
+def build_commands_keyboard() -> InlineKeyboardMarkup:
+    """Buttons for the bot's main commands.
+
+    Note: Telegram inline buttons have no color/style property (unlike, say,
+    Discord's ButtonStyle enum) — every button renders the same neutral gray.
+    Grouping + emoji is the only "styling" available here.
+    """
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📊 Stats", callback_data="cmd_stats"),
+            InlineKeyboardButton("👤 Who am I", callback_data="cmd_whoami"),
+        ],
+        [
+            InlineKeyboardButton("⏱️ Study Status", callback_data="cmd_study_status"),
+            InlineKeyboardButton("➕ Add Task", callback_data="cmd_task_help"),
+        ],
+        [
+            InlineKeyboardButton("🌐 Open TaskBoard", url=WEBAPP_URL),
+        ],
+        [
+            InlineKeyboardButton("🔓 Unlink Account", callback_data="cmd_unlink_ask"),
+        ],
+    ])
+
+
+async def send_welcome_message(bot: Any, chat_id: int, display_name: str) -> None:
+    """Send the post-login welcome message with the command buttons attached."""
+    text = (
+        "🎉 <b>Login Successful!</b>\n\n"
+        f"Welcome to <b>TaskBoard Toolkit</b>, {escape(display_name)}! 🚀\n\n"
+        "Your Telegram is now linked to your account. Use the buttons below, "
+        "or these commands anytime:\n\n"
+        "📊 <code>/stats</code> — pending tasks &amp; today's study hours\n"
+        "➕ <code>/task</code> — add a daily task\n"
+        "⏱️ <code>/study</code> — start / stop / check your study timer\n"
+        "👤 <code>/whoami</code> — check your linked account\n"
+        "🔓 <code>/unlink</code> — disconnect this chat\n\n"
+        "Let's get to work. 💪"
+    )
+    await bot.send_message(
+        chat_id=chat_id,
+        text=text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=build_commands_keyboard(),
+    )
+
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle taps on the command buttons attached to the welcome message."""
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+
+    if data == "cmd_stats":
+        await stats(update, context)
+    elif data == "cmd_whoami":
+        await whoami(update, context)
+    elif data == "cmd_study_status":
+        context.args = ["status"]
+        await study(update, context)
+    elif data == "cmd_task_help":
+        await query.message.reply_text(
+            "Use:\n<code>/task Revise electrostatics</code>\n\n"
+            "Or add many at once:\n"
+            "<code>/task Physics numericals; Chemistry notes; Maths practice</code>",
+            parse_mode=ParseMode.HTML,
+        )
+    elif data == "cmd_unlink_ask":
+        confirm_kb = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("✅ Yes, unlink", callback_data="cmd_unlink_confirm"),
+                InlineKeyboardButton("❌ Cancel", callback_data="cmd_cancel"),
+            ]
+        ])
+        await query.message.reply_text(
+            "Are you sure you want to unlink this chat from TaskBoard?",
+            reply_markup=confirm_kb,
+        )
+    elif data == "cmd_unlink_confirm":
+        await unlink(update, context)
+    elif data == "cmd_cancel":
+        try:
+            await query.edit_message_text("Cancelled.")
+        except Exception:
+            pass
+
+
 async def require_linked_user(update: Update) -> dict[str, Any] | None:
     chat_id = update.effective_chat.id
     try:
@@ -247,22 +334,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🚀 Sign in to TaskBoard", url=callback_url)]
         ])
-        await update.message.reply_text(
+        sent = await update.message.reply_text(
             f"Welcome, {display_name}! \u2728\n\n"
             f"Tap the button below to sign in:",
             reply_markup=keyboard,
         )
+        # Remember this message so we can delete it once login is confirmed
+        # (avoids a stale "Sign in" button sitting in the chat forever).
+        entry["verify_chat_id"] = update.effective_chat.id
+        entry["verify_message_id"] = sent.message_id
         return
 
-    # Normal /start — show help
+    # Normal /start — show help, as buttons
     await update.message.reply_text(
-        "TaskBoard bot is ready.\n\n"
-        "Commands:\n"
-        "/link email@example.com - connect this chat to your TaskBoard account\n"
-        "/stats - show pending tasks and today's study hours\n"
-        "/task task name - add a daily task\n"
-        "/task task 1; task 2; task 3 - add many tasks at once\n"
-        "/unlink - disconnect this Telegram chat"
+        "TaskBoard bot is ready. Tap a button below or use the commands directly.",
+        reply_markup=build_commands_keyboard(),
     )
 
 
@@ -287,7 +373,7 @@ async def link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def unlink(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await sb.unlink_chat(update.effective_chat.id)
-    await update.message.reply_text("This Telegram chat is no longer linked to TaskBoard.")
+    await update.effective_message.reply_text("This Telegram chat is no longer linked to TaskBoard.")
 
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -354,7 +440,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"<b>Pending tasks:</b> {len(pending)}",
         *(task_rows or ["- No pending tasks."]),
     ]
-    await update.message.reply_text("\n".join(message), parse_mode=ParseMode.HTML)
+    await update.effective_message.reply_text("\n".join(message), parse_mode=ParseMode.HTML)
 
 
 async def task(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -364,7 +450,7 @@ async def task(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     raw = update.message.text.partition(" ")[2]
     titles = parse_task_titles(raw)
     if not titles:
-        await update.message.reply_text(
+        await update.effective_message.reply_text(
             "Use:\n"
             "<code>/task Revise electrostatics</code>\n\n"
             "Or add many:\n"
@@ -374,7 +460,7 @@ async def task(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     added = await sb.add_tasks(user["id"], titles, today_key())
     rows = [f"- {escape(row.get('title'))}" for row in added]
-    await update.message.reply_text(
+    await update.effective_message.reply_text(
         f"Added {len(added)} task(s) for today:\n" + "\n".join(rows),
         parse_mode=ParseMode.HTML,
     )
@@ -392,14 +478,14 @@ async def study(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             subject_name = active_timer.get("subject_name") or "Subject"
             started_at = active_timer.get("started_at")
             elapsed = int(time.time() - started_at)
-            await update.message.reply_text(
+            await update.effective_message.reply_text(
                 f"⏱️ You are currently studying <b>{escape(subject_name)}</b> for <b>{format_duration(elapsed)}</b>.\n\n"
                 f"To stop the timer, use:\n"
                 f"<code>/study stop</code>",
                 parse_mode=ParseMode.HTML
             )
         else:
-            await update.message.reply_text(
+            await update.effective_message.reply_text(
                 "📚 No active study timer.\n\n"
                 "To start studying a subject, use:\n"
                 "<code>/study Physics</code>\n\n"
@@ -451,7 +537,7 @@ async def study(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if arg.lower() == "stop":
         if not active_timer or not active_timer.get("subject_id"):
-            await update.message.reply_text("No active study timer is running.")
+            await update.effective_message.reply_text("No active study timer is running.")
             return
 
         subject_id = active_timer.get("subject_id")
@@ -480,7 +566,7 @@ async def study(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         # Save to DB
         await sb.update_study_data(user["id"], study_subjects, today_study_seconds, total_study_seconds, study_date, None)
-        await update.message.reply_text(
+        await update.effective_message.reply_text(
             f"⏹️ Stopped studying <b>{escape(subject_name)}</b>.\n"
             f"Session duration: <b>{format_duration(elapsed)}</b>.\n"
             f"Total study today: <b>{format_duration(today_study_seconds)}</b>.",
@@ -493,14 +579,14 @@ async def study(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             subject_name = active_timer.get("subject_name") or "Subject"
             started_at = active_timer.get("started_at")
             elapsed = int(time.time() - started_at)
-            await update.message.reply_text(
+            await update.effective_message.reply_text(
                 f"⏱️ You are currently studying <b>{escape(subject_name)}</b> for <b>{format_duration(elapsed)}</b>.\n\n"
                 f"To stop the timer, use:\n"
                 f"<code>/study stop</code>",
                 parse_mode=ParseMode.HTML
             )
         else:
-            await update.message.reply_text(
+            await update.effective_message.reply_text(
                 "📚 No active study timer.",
                 parse_mode=ParseMode.HTML
             )
@@ -519,7 +605,7 @@ async def study(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if not subject_id:
         if len(study_subjects) >= 10:
-            await update.message.reply_text("Cannot create new subject. Maximum of 10 subjects allowed on TaskBoard.")
+            await update.effective_message.reply_text("Cannot create new subject. Maximum of 10 subjects allowed on TaskBoard.")
             return
         subject_id = int(time.time() * 1000)
         colors = ["#38c9a8", "#3b82f6", "#ef4444", "#f59e0b", "#10b981", "#8b5cf6", "#ec4899", "#14b8a6", "#f43f5e"]
@@ -557,7 +643,7 @@ async def study(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Save to DB
     await sb.update_study_data(user["id"], study_subjects, today_study_seconds, total_study_seconds, study_date, new_timer)
     
-    await update.message.reply_text(
+    await update.effective_message.reply_text(
         f"{stop_msg}▶️ Started studying <b>{escape(subject_name)}</b>! Timer is running.\n\n"
         f"Use <code>/study stop</code> when you are done.",
         parse_mode=ParseMode.HTML
@@ -568,7 +654,7 @@ async def whoami(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = await require_linked_user(update)
     if not user:
         return
-    await update.message.reply_text(
+    await update.effective_message.reply_text(
         f"Linked as {user.get('name') or 'TaskBoard user'}\n"
         f"Email: {user.get('email') or 'unknown'}"
     )
@@ -602,6 +688,7 @@ def main() -> None:
     application.add_handler(CommandHandler("study", study))
     application.add_handler(CommandHandler("timer", study))
     application.add_handler(CommandHandler("whoami", whoami))
+    application.add_handler(CallbackQueryHandler(button_handler))
     application.add_error_handler(error_handler)
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
@@ -610,4 +697,4 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        asyncio.run(sb.close())
+        asyncio.run(sb.close())v
