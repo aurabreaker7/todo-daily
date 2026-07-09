@@ -584,7 +584,13 @@ async def rest_proxy(
     if method == "GET":
         return await sb.request("GET", table, params=params)
 
-    payload = clean_payload(await request.json()) if method in {"POST", "PATCH"} else None
+    raw_payload = await request.json() if method in {"POST", "PATCH"} else None
+    # IMPORTANT: only strip nulls on INSERT (POST). On PATCH an explicit
+    # `null` is intentional (e.g. clearing an active study_timer, or
+    # unlinking telegram_chat_id) — stripping it there silently prevented
+    # the field from ever being cleared, which is the stale study_timer
+    # bug (bot kept "seeing" an old timer after it was stopped on the web).
+    payload = clean_payload(raw_payload) if method == "POST" else raw_payload
 
     if method == "POST":
         if table == "users":
