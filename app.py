@@ -10,16 +10,19 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
-from telegram.ext import Application, CommandHandler
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler
 
 from telegram_bot import (
     BOT_TOKEN,
     sb,
+    button_handler,
     error_handler,
     link,
     pending_telegram_tokens,
+    send_welcome_message,
     start,
     stats,
+    study,
     task,
     unlink,
     whoami,
@@ -178,7 +181,10 @@ async def startup() -> None:
     telegram_app.add_handler(CommandHandler("unlink", unlink))
     telegram_app.add_handler(CommandHandler("stats", stats))
     telegram_app.add_handler(CommandHandler("task", task))
+    telegram_app.add_handler(CommandHandler("study", study))
+    telegram_app.add_handler(CommandHandler("timer", study))
     telegram_app.add_handler(CommandHandler("whoami", whoami))
+    telegram_app.add_handler(CallbackQueryHandler(button_handler))
     telegram_app.add_error_handler(error_handler)
     await telegram_app.initialize()
     await telegram_app.start()
@@ -256,6 +262,8 @@ async def telegram_callback(token: str, request: Request) -> RedirectResponse:
     telegram_id = entry["telegram_id"]
     display_name = entry["display_name"] or "User"
     telegram_username = entry.get("telegram_username") or ""
+    verify_chat_id = entry.get("verify_chat_id")
+    verify_message_id = entry.get("verify_message_id")
     pending_telegram_tokens.pop(token, None)
 
     email = f"tg_{telegram_id}@telegram.local"
@@ -388,6 +396,21 @@ async def telegram_callback(token: str, request: Request) -> RedirectResponse:
                 )
         except Exception:
             pass  # Profile update is best-effort; login still works
+
+    # 4b. Clean up the "Sign in to TaskBoard" message and greet the user
+    # in the bot chat now that login has actually gone through.
+    if telegram_app:
+        if verify_chat_id and verify_message_id:
+            try:
+                await telegram_app.bot.delete_message(
+                    chat_id=verify_chat_id, message_id=verify_message_id
+                )
+            except Exception:
+                pass  # Message may already be gone; not critical.
+        try:
+            await send_welcome_message(telegram_app.bot, telegram_id, display_name)
+        except Exception:
+            pass  # Best-effort; login must still succeed even if this fails.
 
     # 5. Redirect with session hash — same pattern as Google OAuth
     return RedirectResponse(f"/#{session_fragment}")
