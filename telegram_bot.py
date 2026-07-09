@@ -697,4 +697,4 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        asyncio.run(sb.close())v
+        asyncio.run(sb.close())
