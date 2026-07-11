@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import os
 import time
@@ -100,6 +101,34 @@ class ProfilePatch(BaseModel):
     study_subjects: list[dict[str, Any]] | None = None
 
 
+async def fetch_telegram_avatar_data_url(telegram_id: int) -> str | None:
+    """Best-effort fetch of a user's current Telegram profile photo, returned
+    as a small base64 data: URL (same format the "upload from device" avatar
+    picker already produces client-side), so it can be stored directly in
+    the existing `avatar_url` column.
+    """
+    if not telegram_app or not BOT_TOKEN:
+        return None
+    try:
+        photos = await telegram_app.bot.get_user_profile_photos(telegram_id, limit=1)
+        if not photos or not photos.photos:
+            return None
+        # Smallest available size is first in the list — plenty for an avatar
+        # and keeps the resulting data: URL compact.
+        file_id = photos.photos[0][0].file_id
+        tg_file = await telegram_app.bot.get_file(file_id)
+        file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{tg_file.file_path}"
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(file_url)
+        if resp.status_code >= 400 or not resp.content:
+            return None
+        content_type = resp.headers.get("content-type", "image/jpeg")
+        encoded = base64.b64encode(resp.content).decode("ascii")
+        return f"data:{content_type};base64,{encoded}"
+    except Exception:
+        return None  # Avatar fetch is best-effort; login must still succeed.
+
+
 async def supabase_auth_request(method: str, path: str, **kwargs: Any) -> Any:
     headers = kwargs.pop("headers", {})
     headers.update({"apikey": SUPABASE_ANON_KEY})
@@ -140,11 +169,20 @@ async def current_profile(auth_user: dict[str, Any] = Depends(current_auth_user)
         return rows[0]
     email = auth_user.get("email") or ""
     name = (auth_user.get("user_metadata") or {}).get("name") or email.split("@")[0] or "User"
+    # If the user signed in via Google, Supabase surfaces their Google
+    # profile photo inside user_metadata (as "avatar_url" or "picture"
+    # depending on provider version) — reuse it as the TaskBoard avatar.
+    avatar_url = (auth_user.get("user_metadata") or {}).get("avatar_url") or (
+        auth_user.get("user_metadata") or {}
+    ).get("picture")
+    payload: dict[str, Any] = {"name": name, "email": email, "auth_id": auth_user["id"]}
+    if avatar_url:
+        payload["avatar_url"] = avatar_url
     created = await sb.request(
         "POST",
         "users",
         headers={"prefer": "return=representation"},
-        json={"name": name, "email": email, "auth_id": auth_user["id"]},
+        json=payload,
     )
     return created[0]
 
@@ -208,6 +246,16 @@ async def health() -> dict[str, str]:
 @app.get("/")
 async def index() -> FileResponse:
     return FileResponse("index.html")
+
+
+@app.get("/style.css")
+async def style_css() -> FileResponse:
+    return FileResponse("style.css", media_type="text/css")
+
+
+@app.get("/script.js")
+async def script_js() -> FileResponse:
+    return FileResponse("script.js", media_type="application/javascript")
 
 
 @app.post("/api/auth/login")
@@ -368,31 +416,51 @@ async def telegram_callback(token: str, request: Request) -> RedirectResponse:
             existing = await sb.request(
                 "GET",
                 "users",
-                params={"auth_id": f"eq.{auth_user_id}", "select": "id", "limit": "1"},
+                params={
+                    "auth_id": f"eq.{auth_user_id}",
+                    "select": "id,avatar_url",
+                    "limit": "1",
+                },
+            )
+            # Best-effort fetch of the user's current Telegram profile photo.
+            # Only applied when the profile doesn't already have a custom
+            # avatar, so it never clobbers something the user picked on the
+            # web dashboard.
+            needs_avatar = not existing or not existing[0].get("avatar_url")
+            avatar_url = (
+                await fetch_telegram_avatar_data_url(telegram_id)
+                if needs_avatar
+                else None
             )
             if existing:
+                patch: dict[str, Any] = {
+                    "telegram_username": telegram_username,
+                    "telegram_chat_id": str(telegram_id),
+                }
+                if avatar_url:
+                    patch["avatar_url"] = avatar_url
                 await sb.request(
                     "PATCH",
                     "users",
                     params={"auth_id": f"eq.{auth_user_id}"},
                     headers={"prefer": "return=minimal"},
-                    json={
-                        "telegram_username": telegram_username,
-                        "telegram_chat_id": str(telegram_id),
-                    },
+                    json=patch,
                 )
             else:
+                create_payload: dict[str, Any] = {
+                    "name": display_name,
+                    "email": email,
+                    "auth_id": auth_user_id,
+                    "telegram_username": telegram_username,
+                    "telegram_chat_id": str(telegram_id),
+                }
+                if avatar_url:
+                    create_payload["avatar_url"] = avatar_url
                 await sb.request(
                     "POST",
                     "users",
                     headers={"prefer": "return=minimal"},
-                    json={
-                        "name": display_name,
-                        "email": email,
-                        "auth_id": auth_user_id,
-                        "telegram_username": telegram_username,
-                        "telegram_chat_id": str(telegram_id),
-                    },
+                    json=create_payload,
                 )
         except Exception:
             pass  # Profile update is best-effort; login still works
