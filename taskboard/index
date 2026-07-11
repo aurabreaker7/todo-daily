@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TaskBoard — Daily Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<div id="loading-screen">
+  <div class="load-logo">TaskBoard ✦</div>
+  <div class="load-spinner"></div>
+  <div class="load-msg" id="load-msg">Connecting to database…</div>
+</div>
+
+<!-- AUTH -->
+<div id="auth">
+  <div class="auth-wrap">
+    <div class="auth-box">
+      <div class="brand">TaskBoard</div>
+      <div class="brand-sub">Daily tracker. Visual progress. Zero excuses.</div>
+      <button class="gbtn" onclick="doGoogleSignIn()">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.56 2.7-3.87 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.98v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.17.28-1.7V4.97H.98A9 9 0 0 0 0 9c0 1.45.35 2.83.98 4.03l2.97-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .98 4.97l2.97 2.33C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
+        Continue with Google
+      </button>
+      <button class="tgbtn" onclick="doTelegramSignIn()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+        Continue with Telegram
+      </button>
+      <div class="auth-divider"><span>or</span></div>
+      <div class="tabs">
+        <button class="tab on" onclick="swTab('li')">Sign In</button>
+        <button class="tab" onclick="swTab('su')">Sign Up</button>
+      </div>
+      <div id="li-form">
+        <div class="fg"><label>Email</label><input id="li-e" type="email" placeholder="you@example.com" autocomplete="email"/></div>
+        <div class="fg"><label>Password</label><input id="li-p" type="password" placeholder="Password" autocomplete="current-password"/></div>
+        <button class="abtn" onclick="doLogin()">Sign In →</button>
+        <div class="aerr" id="li-err"></div>
+        <div style="text-align:center;margin-top:14px"><a href="#" style="font-size:.78rem;color:var(--accent2)" onclick="swTab('mg');return false">Had an account before email login? Upgrade it here →</a></div>
+      </div>
+      <div id="su-form" style="display:none">
+        <div class="fg"><label>Full Name</label><input id="su-n" type="text" placeholder="Your full name" autocomplete="username"/></div>
+        <div class="fg"><label>Email</label><input id="su-e" type="email" placeholder="you@example.com" autocomplete="email"/></div>
+        <div class="fg"><label>Password</label><input id="su-p" type="password" placeholder="Min 6 characters" autocomplete="new-password"/></div>
+        <div class="fg"><label>Confirm</label><input id="su-p2" type="password" placeholder="Repeat password" autocomplete="new-password"/></div>
+        <button class="abtn" onclick="doSignup()">Create Account →</button>
+        <div class="aerr" id="su-err"></div>
+        <div class="aok" id="su-ok"></div>
+      </div>
+      <!-- ONE-TIME MIGRATION: existing name+password accounts link to a real email login -->
+      <div id="mg-form" style="display:none">
+        <div id="mg-step1">
+          <div style="font-size:.8rem;color:var(--text2);margin-bottom:16px">Step 1 — confirm your old login</div>
+          <div class="fg"><label>Name</label><input id="mg-n" type="text" placeholder="Your old username" autocomplete="username"/></div>
+          <div class="fg"><label>Old Password</label><input id="mg-op" type="password" placeholder="Your old password" autocomplete="current-password"/></div>
+          <button class="abtn" onclick="mgVerify()">Continue →</button>
+          <div class="aerr" id="mg-err"></div>
+        </div>
+        <div id="mg-step2" style="display:none">
+          <div style="font-size:.8rem;color:var(--text2);margin-bottom:16px">Step 2 — set your email + a new password</div>
+          <div class="fg"><label>Email</label><input id="mg-e" type="email" placeholder="you@example.com" autocomplete="email"/></div>
+          <div class="fg"><label>New Password</label><input id="mg-np" type="password" placeholder="Min 6 characters" autocomplete="new-password"/></div>
+          <button class="abtn" onclick="mgFinish()">Upgrade Account →</button>
+          <div class="aerr" id="mg-err2"></div>
+          <div class="aok" id="mg-ok"></div>
+        </div>
+        <div style="text-align:center;margin-top:14px"><a href="#" style="font-size:.78rem;color:var(--text2)" onclick="swTab('li');return false">← Back to Sign In</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <!-- ═══ SIDE DRAWER ═══ -->
+  <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+  <div class="drawer" id="sideDrawer">
+    <div class="drawer-header">
+      <div class="drawer-logo">TaskBoard ✦</div>
+      <button class="drawer-close" onclick="closeDrawer()">✕</button>
+    </div>
+    <div class="drawer-user">
+      <div class="drawer-av editable" id="dAv" onclick="openAvatarModal(event)">U</div>
+      <div style="flex:1;min-width:0">
+        <div class="drawer-username" id="dName">User</div>
+        <div class="lvl-row">
+          <span class="lvl-badge">⭐ Lv <span id="dLvl">1</span></span>
+          <div class="xp-track"><div class="xp-fill" id="dXpFill" style="width:0%"></div></div>
+          <span class="xp-txt" id="dXpTxt">0/5</span>
+        </div>
+      </div>
+    </div>
+    <div class="drawer-nav">
+      <div class="drawer-section-label">Navigation</div>
+      <div class="drawer-nav-item active" id="dnav-tasks" onclick="showPage('tasks',this);closeDrawer()">
+        <span class="drawer-nav-icon">📋</span><span class="drawer-nav-label">Tasks</span>
+      </div>
+      <div class="drawer-nav-item" id="dnav-calendar" onclick="showPage('calendar',this);closeDrawer()">
+        <span class="drawer-nav-icon">📅</span><span class="drawer-nav-label">Calendar</span>
+      </div>
+      <div class="drawer-nav-item" id="dnav-graphs" onclick="showPage('graphs',this);closeDrawer()">
+        <span class="drawer-nav-icon">📊</span><span class="drawer-nav-label">Graphs</span>
+      </div>
+      <div class="drawer-nav-item" id="dnav-analytics" onclick="showPage('analytics',this);closeDrawer()">
+        <span class="drawer-nav-icon">🔥</span><span class="drawer-nav-label">Analytics & Streak</span>
+      </div>
+      <div class="drawer-nav-item" id="dnav-leaderboard" onclick="showPage('leaderboard',this);closeDrawer()">
+        <span class="drawer-nav-icon">🏆</span><span class="drawer-nav-label">Leaderboard</span>
+      </div>
+      <div class="drawer-section-label">More</div>
+      <div class="drawer-nav-item" id="dnav-insights" onclick="showPage('insights',this);closeDrawer()">
+        <span class="drawer-nav-icon">💡</span><span class="drawer-nav-label">Insights</span>
+        <span class="drawer-nav-badge">New</span>
+      </div>
+      <div class="drawer-nav-item" id="dnav-profile" onclick="showPage('profile',this);closeDrawer()">
+        <span class="drawer-nav-icon">👤</span><span class="drawer-nav-label">Profile & Settings</span>
+      </div>
+      <div class="drawer-section-label">Tools</div>
+      <div class="drawer-nav-item" onclick="toggleTheme();closeDrawer()" id="themeDrawerItem">
+        <span class="drawer-nav-icon">🌙</span><span class="drawer-nav-label" id="themeDrawerLabel">Dark Mode</span>
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button class="drawer-logout-btn" onclick="doLogout()">
+        <span>↩</span> Sign Out
+      </button>
+      <div class="drawer-credit">
+        Created with <span style="color:var(--accent3)">❤️</span> by <strong>Shreyansh</strong>
+      </div>
+    </div>
+  </div>
+
+  <header>
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="hamburger" id="hamburgerBtn" onclick="toggleDrawer()">
+        <div class="ham-line"></div>
+        <div class="ham-line"></div>
+        <div class="ham-line"></div>
+      </button>
+      <div class="hlogo">TaskBoard</div>
+    </div>
+    <div class="hright">
+      <input class="hdr-search" id="gSearch" placeholder="🔍 Search tasks…" oninput="onSearch()" autocomplete="off"/>
+      <button id="themeBtn" onclick="toggleTheme()" title="Toggle Theme" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0">🌙</button>
+      <div class="ubadge" onclick="showPage('profile',document.getElementById('dnav-profile'));closeDrawer()">
+        <div class="uav editable" id="hav" onclick="openAvatarModal(event)">U</div><span class="uname" id="hun">User</span>
+      </div>
+    </div>
+  </header>
+  <div class="nav-tabs">
+    <button class="ntab on" data-p="tasks"     onclick="showPage('tasks',this)">📋 Tasks</button>
+    <button class="ntab"    data-p="calendar"  onclick="showPage('calendar',this)">📅 Calendar</button>
+    <button class="ntab"    data-p="graphs"    onclick="showPage('graphs',this)">📊 Graphs</button>
+    <button class="ntab"    data-p="analytics" onclick="showPage('analytics',this)">🔥 Analytics</button>
+    <button class="ntab"    data-p="leaderboard" onclick="showPage('leaderboard',this)">🏆 Leaderboard</button>
+    <button class="ntab"    data-p="profile"   onclick="showPage('profile',this)">👤 Profile</button>
+  </div>
+
+  <div class="page on" id="page-tasks">
+    <div class="ph"><h1>Hey <em id="greet">User</em> 👋</h1><p id="today-lbl">Here's your board for today.</p></div>
+
+    <div class="stats">
+      <div class="sc c1"><div class="sc-icon">📋</div><div class="sn" id="s-total">0</div><div class="sl">Today Total</div></div>
+      <div class="sc c2"><div class="sc-icon">✅</div><div class="sn" id="s-done">0</div><div class="sl">Done Today</div></div>
+      <div class="sc c3"><div class="sc-icon">👤</div><div class="sn" id="s-mine">0</div><div class="sl">My Tasks</div></div>
+      <div class="sc c4"><div class="sc-icon">🔥</div><div class="sn" id="s-streak">0</div><div class="sl">Day Streak</div></div>
+    </div>
+
+    <div class="focus-score-card">
+      <svg class="focus-score-ring" width="72" height="72" viewBox="0 0 72 72">
+        <circle cx="36" cy="36" r="30" fill="none" stroke="var(--s3)" stroke-width="7"/>
+        <circle id="focusRingProg" cx="36" cy="36" r="30" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round" stroke-dasharray="0 188.5" transform="rotate(-90 36 36)"/>
+        <text id="focusRingTxt" x="36" y="41" text-anchor="middle" font-size="16" font-weight="800" fill="var(--text)">0%</text>
+      </svg>
+      <div class="focus-score-body">
+        <div class="focus-score-title">Daily Focus Score</div>
+        <div class="focus-score-val" id="focusScoreVal">0%</div>
+        <div class="focus-score-sub">Blends today's task completion with study time</div>
+      </div>
+    </div>
+
+    <!-- ═══ STUDY TIMER ═══ -->
+    <div class="study-section">
+      <div class="study-header">
+        <div class="study-title-row">
+          <div style="font-size:1.3rem">📚</div>
+          <div>
+            <div class="study-title">Daily Study Timer</div>
+            <div style="font-size:.71rem;color:var(--text3);margin-top:2px">Track each subject · Auto-resets at midnight</div>
+          </div>
+        </div>
+        <div class="study-total-box">
+          <div class="study-total-label">Total Study Today</div>
+          <div class="study-total-time" id="studyTotalDisplay">0h 00m</div>
+        </div>
+        <div class="study-header-actions">
+          <button class="study-add-btn" id="studyAddBtn" onclick="openAddSubject()">＋ Add Subject</button>
+          <button class="study-reset-btn" onclick="resetAllStudy()">↺ Reset All</button>
+        </div>
+      </div>
+      <!-- inline add row -->
+      <div class="study-add-row" id="studyAddRow">
+        <input class="study-new-input" id="studyNewName" placeholder="Subject name e.g. Physics, Maths…" maxlength="40"/>
+        <button class="study-confirm-btn" onclick="confirmAddSubject()">Add</button>
+        <button class="study-cancel-btn" onclick="cancelAddSubject()">Cancel</button>
+      </div>
+      <!-- subject list — FIXED: using a separate div, not one that gets overwritten -->
+      <div id="studyList"></div>
+    </div>
+
+    <!-- ═══ POMODORO ═══ -->
+    <div class="pom-section">
+      <div class="pom-top">
+        <div style="font-size:1.3rem">🍅</div>
+        <div class="pom-icon-label">
+          <div class="pom-label-text">Pomodoro Focus</div>
+          <div class="pom-time" id="pomTime">25:00</div>
+        </div>
+        <div class="pom-controls">
+          <div class="pom-dur-group">
+            <button class="pom-dur-btn active" onclick="setPomDur(25,this)">25 min</button>
+            <button class="pom-dur-btn" onclick="setPomDur(45,this)">45 min</button>
+            <button class="pom-dur-btn" onclick="setPomDur(90,this)">1h 30m</button>
+            <button class="pom-dur-btn" onclick="setPomDur(180,this)">3 hrs</button>
+          </div>
+          <button id="pomBtn" class="pom-start-btn" onclick="togglePom()">▶ Start</button>
+          <button class="pom-reset-btn" onclick="resetPom()" title="Reset">↺</button>
+        </div>
+      </div>
+      <div class="pom-progress"><div class="pom-prog-fill" id="pomProgFill" style="width:100%"></div></div>
+      <div class="pom-session-info">
+        <div class="pom-session-chip">Sessions today: <span id="pomSessions">0</span></div>
+        <div class="pom-session-chip">Total focus: <span id="pomTotalFocus">0m</span></div>
+        <div class="pom-session-chip" id="pomStatusChip" style="color:var(--accent2);display:none">● Running</div>
+      </div>
+    </div>
+
+    <!-- Quick note -->
+    <div class="qnote">
+      <div class="qnote-hdr"><span>⚡ Quick Note</span><button class="btn-xs" onclick="saveQNote()">Save</button></div>
+      <div class="qnote-body"><textarea class="qnote-ta" id="qNote" placeholder="Jot something down quickly…"></textarea></div>
+    </div>
+
+    <!-- Add task -->
+    <div class="add-card">
+      <div class="add-label">✚ Add New Task</div>
+      <div class="add-row">
+        <input class="ai" id="t-title" placeholder="What needs to be done?" type="text"/>
+        <select class="ai" id="t-cat">
+          <option value="work">💼 Work</option><option value="personal">🏠 Personal</option>
+          <option value="health">💪 Health</option><option value="study">📚 Study</option><option value="other">🔖 Other</option>
+        </select>
+        <select class="ai" id="t-pri">
+          <option value="normal">🟡 Normal</option><option value="high">🔴 High</option><option value="low">🟢 Low</option>
+        </select>
+      </div>
+      <div class="add-row2">
+        <textarea class="ai" id="t-desc" placeholder="Notes… Subtasks: start each with - dash" style="margin:0"></textarea>
+        <input class="ai" id="t-date" type="date"/>
+        <input class="ai" id="t-time" type="time"/>
+      </div>
+      <div class="add-row3">
+        <button class="pbtn" onclick="addTask()">＋ Add Task</button>
+      </div>
+    </div>
+
+    <div class="date-nav">
+      <button class="arrbtn" onclick="changeDate(-1)">‹</button>
+      <div style="flex:1"><div class="date-display" id="dn-lbl">Today</div><div class="date-sub" id="dn-sub">Today</div></div>
+      <button class="arrbtn" onclick="changeDate(1)">›</button>
+      <button class="today-btn" onclick="goToday()">Today</button>
+    </div>
+
+    <div class="fbar">
+      <button class="fbtn on" onclick="setF('all',this)">All</button>
+      <button class="fbtn" onclick="setF('mine',this)">Mine</button>
+      <button class="fbtn" onclick="setF('pending',this)">Pending</button>
+      <button class="fbtn" onclick="setF('done',this)">Done</button>
+      <button class="fbtn" onclick="setF('pinned',this)">📌 Pinned</button>
+      <button class="fbtn" onclick="setF('work',this)">💼 Work</button>
+      <button class="fbtn" onclick="setF('health',this)">💪 Health</button>
+      <button class="fbtn" onclick="setF('study',this)">📚 Study</button>
+    </div>
+    <div class="tgrid" id="tgrid"></div>
+  </div>
+
+  <!-- CALENDAR -->
+  <div class="page" id="page-calendar">
+    <div class="ph"><h1>Monthly <em>Calendar</em> 📅</h1><p>Click any day to see tasks.</p></div>
+    <div class="month-nav"><button class="arrbtn" onclick="changeCalMonth(-1)">‹</button><div class="month-label" id="calMonthLbl">Month</div><button class="arrbtn" onclick="changeCalMonth(1)">›</button></div>
+    <div class="cal-grid-wrap">
+      <div class="cal-weekdays"><div class="cal-wd">Sun</div><div class="cal-wd">Mon</div><div class="cal-wd">Tue</div><div class="cal-wd">Wed</div><div class="cal-wd">Thu</div><div class="cal-wd">Fri</div><div class="cal-wd">Sat</div></div>
+      <div class="cal-days-g" id="calDays"></div>
+    </div>
+    <div class="day-detail" id="dayDetail" style="display:none;margin-top:16px">
+      <div class="dd-title" id="ddTitle">Day</div>
+      <div class="dd-lbl">Tasks</div><div id="ddTasks" style="margin-bottom:14px"></div>
+    </div>
+  </div>
+
+  <!-- GRAPHS -->
+  <div class="page" id="page-graphs">
+    <div class="ph"><h1>Your <em>Progress</em> 📈</h1><p>Daily completions, weekly trends and 30-day heatmap.</p></div>
+    <div class="graph-grid">
+      <div class="gc"><div class="gc-title">Daily Completions</div><div class="gc-sub">Last 7 days</div><div class="bar-chart" id="bar-daily"></div></div>
+      <div class="gc"><div class="gc-title">Completion Rate %</div><div class="gc-sub">Last 7 days</div><div class="lc-wrap"><svg class="lc" id="lc-rate" viewBox="0 0 300 140" preserveAspectRatio="none"></svg></div></div>
+      <div class="gc"><div class="gc-title">Today's Rings</div><div class="gc-sub">My tasks vs all tasks</div><div class="ring-row" id="rings"></div></div>
+      <div class="gc"><div class="gc-title">Added vs Done</div><div class="gc-sub">This week</div><div class="bar-chart" id="bar-cmp"></div><div style="display:flex;gap:12px;margin-top:8px;font-size:.73rem;color:var(--text2)"><span><span style="display:inline-block;width:9px;height:9px;background:rgba(232,168,56,.7);border-radius:2px;margin-right:4px;vertical-align:middle"></span>Added</span><span><span style="display:inline-block;width:9px;height:9px;background:rgba(56,201,168,.8);border-radius:2px;margin-right:4px;vertical-align:middle"></span>Done</span></div></div>
+      <div class="gc wide"><div class="gc-title">30-Day Heatmap</div><div class="gc-sub">Completion intensity</div><div class="hm-lbls"><div class="hm-lbl">Sun</div><div class="hm-lbl">Mon</div><div class="hm-lbl">Tue</div><div class="hm-lbl">Wed</div><div class="hm-lbl">Thu</div><div class="hm-lbl">Fri</div><div class="hm-lbl">Sat</div></div><div class="heatmap" id="heatmap"></div><div class="hm-legend"><span>Less</span><div class="hm-sw" style="background:var(--s2)"></div><div class="hm-sw" style="background:rgba(232,168,56,.25)"></div><div class="hm-sw" style="background:rgba(232,168,56,.5)"></div><div class="hm-sw" style="background:rgba(232,168,56,.75)"></div><div class="hm-sw" style="background:var(--accent)"></div><span>More</span></div></div>
+    </div>
+  </div>
+
+  <!-- ANALYTICS -->
+  <div class="page" id="page-analytics">
+    <div class="ph"><h1>Analytics <em>&</em> Streak 🔥</h1><p>Completion rates, categories, and your activity history.</p></div>
+    <div class="an-grid">
+      <div class="an-card"><div class="ac-title">🔥 Streak</div><div class="ac-sub">Consecutive days with completions</div><div class="streak-count" id="streakBig">0</div><div class="streak-lbl">days in a row</div><div class="streak-row" id="streakRow"></div></div>
+      <div class="an-card"><div class="ac-title">📊 Categories</div><div class="ac-sub">Completion rate by category</div><div id="catProgress"></div></div>
+      <div class="an-card full"><div class="ac-title">📅 4-Week Trend</div><div class="ac-sub">Added vs completed per week</div><div class="bar-chart" id="wkAnalytics"></div></div>
+      <div class="an-card full"><div class="ac-title">⏰ This Month</div><div class="ac-sub">Daily activity heatmap</div><div id="monthHmap" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:10px"></div></div>
+    </div>
+  </div>
+
+  <!-- PROFILE -->
+  <div class="page" id="page-profile">
+    <div class="ph"><h1>My <em>Profile</em> 👤</h1><p>Account settings and achievements.</p></div>
+    <div class="prof-grid">
+      <div>
+        <div class="prof-card" style="margin-bottom:15px">
+          <div class="prof-av" id="pAv" onclick="openAvatarModal(event)">U</div>
+          <div class="prof-name" id="pName">User</div>
+          <div class="prof-since" id="pSince">Member since —</div>
+          <div class="lvl-row" style="justify-content:center;margin:8px 0 4px">
+            <span class="lvl-badge">⭐ Level <span id="pLvl">1</span></span>
+            <div class="xp-track" style="max-width:120px"><div class="xp-fill" id="pXpFill" style="width:0%"></div></div>
+            <span class="xp-txt" id="pXpTxt">0/5</span>
+          </div>
+          <div class="prof-stats">
+            <div class="pstat"><div class="pstat-val" id="pTotal">0</div><div class="pstat-lbl">Tasks</div></div>
+            <div class="pstat"><div class="pstat-val" id="pDone">0</div><div class="pstat-lbl">Done</div></div>
+            <div class="pstat"><div class="pstat-val" id="pStrk">0🔥</div><div class="pstat-lbl">Streak</div></div>
+            <div class="pstat"><div class="pstat-val" id="pStudy">0h</div><div class="pstat-lbl">Study hrs</div></div>
+          </div>
+          <div class="profile-form">
+            <div class="sec-title">Profile Customization</div>
+            <input class="pf-in" id="pf-name" maxlength="36" placeholder="Username"/>
+            <input class="pf-in" id="pf-status" maxlength="80" placeholder="Status or goal e.g. JEE Exam Preparation"/>
+            <div class="profile-hint">Saved locally first, then synced to your account so it stays after closing the browser.</div>
+            <button class="btn-sm" onclick="saveProfilePrefs()">Save Profile</button>
+          </div>
+          <div class="sec-title">Change Password</div>
+          <button class="btn-sm" onclick="togglePwForm()" style="width:100%;margin-bottom:8px">🔑 Change Password</button>
+          <div class="pw-form" id="pwForm">
+            <input class="pf-in" id="pw-old" type="password" placeholder="Current password"/>
+            <input class="pf-in" id="pw-new" type="password" placeholder="New password (min 4)"/>
+            <input class="pf-in" id="pw-c" type="password" placeholder="Confirm new password"/>
+            <button class="btn-sm" onclick="changePassword()">Update Password</button>
+          </div>
+          <div class="sec-title" style="margin-top:16px">Danger Zone</div>
+          <button class="btn-danger" onclick="clearMyData()">🗑 Clear All My Tasks</button>
+        </div>
+      </div>
+      <div class="prof-card">
+        <div class="sec-title" style="margin-bottom:14px">🏆 Achievements</div>
+        <div class="ach-grid" id="achGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div class="page" id="page-leaderboard">
+    <div class="ph"><h1>Global <em>Leaderboard</em> 🏆</h1><p>See how your study hours and focus stack up against the community.</p></div>
+    <div id="lbLoading" style="text-align:center;color:var(--text3);padding:30px 0">Loading rankings…</div>
+    <div id="lbPodium" class="lb-podium" style="display:none"></div>
+    <div id="lbTable" class="lb-table"></div>
+  </div>
+
+  <!-- ═══ INSIGHTS PAGE ═══ -->
+  <div class="page" id="page-insights">
+    <div class="ph"><h1>Study <em>Insights</em> 💡</h1><p>Deep dive into your study patterns, time distribution, and subject-wise analysis.</p></div>
+
+    <!-- Hero stats -->
+    <div class="ins-hero">
+      <div class="ins-hero-card today">
+        <div class="ins-hero-icon">☀️</div>
+        <div class="ins-hero-time c-today" id="ins-today-time">0h 00m</div>
+        <div class="ins-hero-label">Today's Study</div>
+      </div>
+      <div class="ins-hero-card week">
+        <div class="ins-hero-icon">📅</div>
+        <div class="ins-hero-time c-week" id="ins-week-time">0h 00m</div>
+        <div class="ins-hero-label">This Week</div>
+      </div>
+      <div class="ins-hero-card month">
+        <div class="ins-hero-icon">🗓️</div>
+        <div class="ins-hero-time c-month" id="ins-month-time">0h 00m</div>
+        <div class="ins-hero-label">This Month</div>
+      </div>
+    </div>
+
+    <div class="ins-grid">
+      <!-- Smart insights -->
+      <div class="ins-card full">
+        <div class="ins-card-title">🧠 Smart Insights</div>
+        <div class="ins-card-sub">Auto-generated highlights from your recent study activity</div>
+        <div class="smart-ins-list" id="insSmartList"></div>
+      </div>
+
+      <!-- Subject breakdown -->
+      <div class="ins-card full">
+        <div class="ins-card-title">📚 Subject Breakdown — Today</div>
+        <div class="ins-card-sub">Time spent per subject with comparison to week average</div>
+        <div id="insSubjectList"><div class="ins-empty"><div class="ins-empty-icon">📖</div>No subjects tracked yet. Add subjects in the Study Timer!</div></div>
+      </div>
+
+      <!-- Daily chart this week -->
+      <div class="ins-card">
+        <div class="ins-card-title">📊 Daily Study — This Week</div>
+        <div class="ins-card-sub">Hours studied each day</div>
+        <div class="study-week-grid" id="insWeekChart"></div>
+        <div style="display:flex;justify-content:center;margin-top:8px;gap:12px;font-size:.72rem;color:var(--text2)">
+          <span>Mon → Sun</span>
+        </div>
+      </div>
+
+      <!-- Subject pie / distribution -->
+      <div class="ins-card">
+        <div class="ins-card-title">🎯 Focus Distribution</div>
+        <div class="ins-card-sub">Which subjects got the most attention today</div>
+        <div id="insFocusDist"></div>
+      </div>
+
+      <!-- Monthly heatmap -->
+      <div class="ins-card full">
+        <div class="ins-card-title">🔥 Monthly Study Heatmap</div>
+        <div class="ins-card-sub">Your study intensity across this month — darker = more hours</div>
+        <div id="insMonthHeatmap" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:.72rem;color:var(--text2)">
+          <span>Less</span>
+          <div style="width:12px;height:12px;border-radius:3px;background:var(--s2)"></div>
+          <div style="width:12px;height:12px;border-radius:3px;background:rgba(56,201,168,.25)"></div>
+          <div style="width:12px;height:12px;border-radius:3px;background:rgba(56,201,168,.5)"></div>
+          <div style="width:12px;height:12px;border-radius:3px;background:rgba(56,201,168,.75)"></div>
+          <div style="width:12px;height:12px;border-radius:3px;background:var(--accent2)"></div>
+          <span>More</span>
+        </div>
+      </div>
+
+      <!-- Best streak & stats -->
+      <div class="ins-card">
+        <div class="ins-card-title">⚡ Quick Stats</div>
+        <div class="ins-card-sub">Your study performance summary</div>
+        <div id="insQuickStats"></div>
+      </div>
+
+      <!-- Top subject -->
+      <div class="ins-card">
+        <div class="ins-card-title">🏆 Top Subjects</div>
+        <div class="ins-card-sub">Most studied subjects overall today</div>
+        <div id="insTopSubjects"></div>
+      </div>
+    </div>
+
+    <!-- Footer credit -->
+    <div style="text-align:center;padding:32px 0 8px;border-top:1px solid var(--border);margin-top:20px">
+      <div style="font-size:.78rem;color:var(--text3);font-family:'Plus Jakarta Sans',sans-serif;line-height:1.8">
+        Made with <span style="color:var(--accent3);font-size:1rem">❤️</span> by <span style="color:var(--text2);font-weight:700">Shreyansh</span><br/>
+        <span style="font-size:.7rem;color:var(--text3)">TaskBoard — Daily Tracker · Stay consistent, stay focused.</span>
+      </div>
+    </div>
+  </div>
+</div><!-- /#app -->
+
+<div class="modal-ov" id="modal" onclick="closeMod()">
+  <button class="mcls" onclick="closeMod()">✕</button>
+  <img id="mod-img" class="modal-img" src="" alt=""/>
+</div>
+<div class="modal-ov" id="avatarModal" onclick="if(event.target===this)closeAvatarModal()">
+  <div class="avatar-modal-box" onclick="event.stopPropagation()">
+    <div class="avatar-modal-head">
+      <div class="avatar-modal-title">Profile Picture</div>
+      <button class="btn-sec" onclick="closeAvatarModal()">Close</button>
+    </div>
+    <input class="pf-in" id="avatarUrl" placeholder="Paste image URL"/>
+    <button class="btn-sm" onclick="saveAvatarUrl()" style="width:100%;margin-bottom:12px">Use Image URL</button>
+    <div class="sec-title">Quick Avatars</div>
+    <div class="avatar-grid" id="avatarChoices"></div>
+    <div class="sec-title">Upload From Device</div>
+    <input class="pf-in" id="avatarFile" type="file" accept="image/*" onchange="handleAvatarFile(event)"/>
+  </div>
+</div>
+<div class="overlay" id="editModal">
+  <div class="mbox">
+    <h3>✏️ Edit Task</h3>
+    <input class="m-in" id="e-title" placeholder="Task title"/>
+    <textarea class="m-ta" id="e-desc" placeholder="Notes…" style="min-height:50px;resize:vertical"></textarea>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
+      <select class="m-in" id="e-cat" style="margin:0"><option value="work">💼 Work</option><option value="personal">🏠 Personal</option><option value="health">💪 Health</option><option value="study">📚 Study</option><option value="other">🔖 Other</option></select>
+      <select class="m-in" id="e-pri" style="margin:0"><option value="normal">🟡 Normal</option><option value="high">🔴 High</option><option value="low">🟢 Low</option></select>
+    </div>
+    <div class="m-acts"><button class="btn-sec" onclick="closeEdit()">Cancel</button><button class="pbtn" onclick="saveEdit()">Save</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"><span id="t-ico"></span><span id="t-msg"></span></div>
+
+<script src="script.js"></script>
+</body>
+</html>
