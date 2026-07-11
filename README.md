@@ -75,7 +75,9 @@ A clean, single-page productivity dashboard to plan your day, track tasks, and s
 
 ```
 📁 taskboard/
-└── 📄 index.html   # The entire web app — auth, task board, timer, graphs, insights, leaderboard, profile
+├── 📄 index.html   # Markup only — auth screens, task board, timer, graphs, insights, leaderboard
+├── 🎨 style.css     # All styling — theme, layout, components
+└── ⚙️ script.js     # All logic — auth client, state, rendering, API calls
 ```
 
 Yes, really — one file. No `npm install`, no bundler, no build pipeline.
