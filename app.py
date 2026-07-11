@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import hashlib
 import os
@@ -232,9 +233,21 @@ async def startup() -> None:
 @app.on_event("shutdown")
 async def shutdown() -> None:
     if telegram_app:
-        await telegram_app.updater.stop()
-        await telegram_app.stop()
-        await telegram_app.shutdown()
+        # On Railway, a redeploy sends SIGTERM with a short grace period.
+        # Telegram's getUpdates long-poll can take a moment to cancel, and
+        # if the network is slow right at that instant python-telegram-bot
+        # raises TimedOut — harmless (the process is exiting anyway), but
+        # left unhandled it prints a scary traceback on every deploy. Give
+        # each shutdown step a bounded timeout and swallow failures here.
+        for step in (
+            telegram_app.updater.stop,
+            telegram_app.stop,
+            telegram_app.shutdown,
+        ):
+            try:
+                await asyncio.wait_for(step(), timeout=5)
+            except Exception as e:  # noqa: BLE001 - best-effort cleanup
+                print(f"Telegram bot shutdown step {step.__qualname__} failed: {e}")
     await sb.close()
 
 
