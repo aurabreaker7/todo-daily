@@ -74,7 +74,6 @@ A clean, single-page productivity dashboard to plan your day, track tasks, and s
 ## 📂 Project Structure
 
 ```
-📁 taskboard/
 ├── 📄 index.html   # Markup only — auth screens, task board, timer, graphs, insights, leaderboard
 ├── 🎨 style.css     # All styling — theme, layout, components
 └── ⚙️ script.js     # All logic — auth client, state, rendering, API calls
