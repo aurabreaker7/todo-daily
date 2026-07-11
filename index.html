@@ -1120,13 +1120,17 @@ const supa={
     async getSession(){
       captureOAuthSessionFromHash();
       const session=apiSession();
-      if(session?.access_token&&!session.user){
-        try{
-          session.user=await apiFetch('/api/auth/user');
-          setApiSession(session);
-        }catch(e){delApiSession();return {data:{session:null},error:{message:e.message||String(e)}};}
-      }
-      return {data:{session:session?{...session,user:session.user}:null},error:null};
+      if(!session?.access_token)return {data:{session:null},error:null};
+      // Always re-validate the token against the backend on boot — a
+      // cached session.user from a previous visit doesn't mean the
+      // access_token is still valid (it may have expired/been revoked
+      // server-side), so a stale local-storage session must never be
+      // trusted without a live check.
+      try{
+        session.user=await apiFetch('/api/auth/user');
+        setApiSession(session);
+      }catch(e){delApiSession();return {data:{session:null},error:{message:e.message||String(e)}};}
+      return {data:{session:{...session,user:session.user}},error:null};
     },
     async signOut(){delApiSession();return {error:null};},
     onAuthStateChange(){return {data:{subscription:{unsubscribe(){}}}};},
@@ -1257,13 +1261,27 @@ async function syncStudyToCloud(force){
   const lifetime=lifetimeStudySeconds();
   if(force || todaySecs!==_lastSyncedTotal){
     _lastSyncedTotal=todaySecs;
+    
+    // Check if there is an active running timer locally
+    let activeTimer = null;
+    if (imap.size > 0) {
+      const activeId = imap.keys().next().value;
+      const rec = imap.get(activeId);
+      const subj = subjects.find(s=>s.id===activeId);
+      activeTimer = {
+        subject_id: activeId,
+        started_at: Math.floor(rec.startTs / 1000),
+        subject_name: subj ? subj.name : 'Subject'
+      };
+    }
+    
     try{
       await supa.from('users').update({
         total_study_seconds: lifetime,
         today_study_seconds: todaySecs,
         study_date: dKey(new Date()),
-        // today's live per-subject state — lets the timer resume correctly on another device
-        study_subjects: subjects.map(s=>({id:s.id,name:s.name,secs:s.secs,color:s.color}))
+        study_subjects: subjects.map(s=>({id:s.id,name:s.name,secs:s.secs,color:s.color})),
+        study_timer: activeTimer
       }).eq('id',CU_ID);
     }catch(e){ /* non-fatal — leaderboard/resume just show stale data until next sync */ }
   }
@@ -1295,16 +1313,54 @@ async function hydrateStudyFromCloud(){
     if(histRows&&histRows.length){
       const localHist=getStudyHistory();
       histRows.forEach(r=>{
-        // cloud is authoritative for days this device hasn't seen; local wins for today's live count
         if(!localHist[r.date]) localHist[r.date]=r.subjects||{};
       });
       try{ localStorage.setItem('tb_study_hist_'+CU_ID, JSON.stringify(localHist)); }catch(e){}
     }
-    const {data:u}=await supa.from('users').select('study_subjects,study_date').eq('id',CU_ID).maybeSingle();
-    // Only resume from the cloud if THIS device has no local session yet today (fresh login elsewhere)
-    if(u&&u.study_date===dKey(new Date())&&Array.isArray(u.study_subjects)&&u.study_subjects.length&&subjects.length===0){
-      subjects=u.study_subjects.map(s=>({id:s.id,name:s.name||'Subject',secs:s.secs||0,color:s.color||'#38c9a8'}));
-      studySave();
+    const {data:u}=await supa.from('users').select('study_subjects,study_date,study_timer').eq('id',CU_ID).maybeSingle();
+    const today = dKey(new Date());
+    
+    if (u && u.study_date === today && Array.isArray(u.study_subjects) && u.study_subjects.length) {
+      const cloudTotal = u.study_subjects.reduce((a,s)=>a+(s.secs||0),0);
+      const localTotal = subjects.reduce((a,s)=>a+(s.secs||0),0);
+      
+      // If cloud seconds differ, or if there's an active timer in cloud, or local is empty, sync from cloud
+      if (cloudTotal !== localTotal || u.study_timer || subjects.length === 0) {
+        // Clear local intervals first
+        imap.forEach((rec)=>{
+          clearInterval(rec.handle);
+        });
+        imap.clear();
+        
+        subjects = u.study_subjects.map(s=>({id:s.id,name:s.name||'Subject',secs:s.secs||0,color:s.color||'#38c9a8'}));
+        studySave();
+        
+        // If there's an active timer in the cloud, resume ticking locally
+        if (u.study_timer && u.study_timer.subject_id) {
+          const sid = Number(u.study_timer.subject_id);
+          const subj = subjects.find(s=>s.id===sid);
+          if (subj) {
+            const startTs = u.study_timer.started_at * 1000;
+            const baseSecs = subj.secs;
+            const iv = setInterval(()=>{
+              subj.secs = baseSecs + Math.floor((Date.now() - startTs)/1000);
+              const tel = document.getElementById('stm_'+sid);
+              if(tel) tel.textContent = studyFmt(subj.secs);
+              const maxSecs = Math.max(...subjects.map(s=>s.secs),1);
+              subjects.forEach(s=>{
+                const pb = document.getElementById('spb_'+s.id);
+                if(pb) pb.style.width = Math.round((s.secs/maxSecs)*100)+'%';
+              });
+              studyUpdateTotal();
+              updateFocusScore();
+              if(subj.secs%30===0) studySave();
+            },1000);
+            imap.set(sid, {handle:iv, startTs, baseSecs});
+          }
+        }
+        renderStudyList();
+        studyUpdateTotal();
+      }
     }
   }catch(e){ console.error('cloud history hydrate failed',e); }
 }
@@ -1387,6 +1443,7 @@ function toggleSubjectTimer(id){
     imap.delete(id);
     studySave();
     _updateSubjCard(id,false);
+    syncStudyToCloud(true);
   } else {
     // Stop any other running subject first (also commits its real elapsed time)
     imap.forEach((rec,oid)=>{
@@ -1417,6 +1474,7 @@ function toggleSubjectTimer(id){
     },1000);
     imap.set(id,{handle:iv,startTs,baseSecs});
     _updateSubjCard(id,true);
+    syncStudyToCloud(true);
   }
 }
 /* real elapsed seconds for a running subject, computed from wall-clock time not tick count */
@@ -1750,8 +1808,26 @@ async function launchApp(){
 // BOOT
 async function _boot(){
   showLoader('Checking session…');
-  const {data}=await supa.auth.getSession();
-  if(data?.session?.user){ await launchApp(); return; }
+  let data;
+  try{
+    ({data}=await supa.auth.getSession());
+  }catch(e){
+    // Never let a boot-time error (bad/expired token, network hiccup, etc.)
+    // leave the app stuck on the loader — fall back to the login screen.
+    console.error(e);
+    delApiSession();
+    data=null;
+  }
+  if(data?.session?.user){
+    try{
+      await launchApp();
+      return;
+    }catch(e){
+      console.error(e);
+      delApiSession();
+      hideLoader();
+    }
+  }
   hideLoader();
   document.getElementById('auth').classList.add('visible');
   _setupKeys();
@@ -2594,6 +2670,13 @@ setInterval(()=>{
 
 // Save history on page unload
 window.addEventListener('beforeunload',()=>{ studySave(); saveStudyHistory(); syncStudyToCloud(true); });
+
+// Pull changes whenever the user focuses/switches back to this tab
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    hydrateStudyFromCloud();
+  }
+});
 
 // ESC to close drawer
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeDrawer(); });
