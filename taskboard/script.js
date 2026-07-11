@@ -698,12 +698,18 @@ async function loadOrCreateProfile(authUser){
   if(!profile){
     const meta=authUser.user_metadata||{};
     let name=pendingProfileName||localStorage.getItem('tb_pending_name')||meta.full_name||meta.name||(authUser.email?authUser.email.split('@')[0]:'User');
+    // Google sign-ins carry the person's Google account photo inside
+    // user_metadata (as "avatar_url" or "picture" depending on provider
+    // version) — reuse it so their TaskBoard avatar matches automatically.
+    const googleAvatar=meta.avatar_url||meta.picture||'';
     // `name` has a unique constraint — Google sign-ins don't let the person pick one up
     // front, so on a collision retry with a short random suffix instead of failing.
     let created=null,error=null;
     for(let attempt=0;attempt<5;attempt++){
       const tryName=attempt===0?name:`${name}${Math.floor(1000+Math.random()*9000)}`;
-      const res=await supa.from('users').insert({name:tryName,email:authUser.email,auth_id:authUser.id}).select().single();
+      const insertPayload={name:tryName,email:authUser.email,auth_id:authUser.id};
+      if(googleAvatar)insertPayload.avatar_url=googleAvatar;
+      const res=await supa.from('users').insert(insertPayload).select().single();
       if(!res.error){ created=res.data; error=null; break; }
       error=res.error;
       if(!(error.message&&error.message.toLowerCase().includes('duplicate'))) break; // some other error — stop retrying
@@ -711,6 +717,17 @@ async function loadOrCreateProfile(authUser){
     if(!created){ toast('⚠️','Could not finish account setup: '+(error?.message||'unknown error'),'err'); return null; }
     profile=created;
     try{localStorage.removeItem('tb_pending_name');}catch(e){}
+  }else if(!profile.avatar_url){
+    // Existing account with no avatar set yet — if this is a Google sign-in,
+    // backfill it from their Google photo (best-effort, doesn't block boot).
+    const meta=authUser.user_metadata||{};
+    const googleAvatar=meta.avatar_url||meta.picture||'';
+    if(googleAvatar){
+      supa.from('users').update({avatar_url:googleAvatar}).eq('auth_id',authUser.id).then(({data:row})=>{
+        if(row)profile.avatar_url=row.avatar_url||googleAvatar;
+      }).catch(()=>{});
+      profile={...profile,avatar_url:googleAvatar};
+    }
   }
   return profile;
 }
