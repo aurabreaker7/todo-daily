@@ -110,9 +110,9 @@ Without a live backend, login and data syncing won't work — but you can still 
 
 <div align="center">
 
-Built with ❤️ by **[@shreyanshhh_08](https://github.com/shreyanshhh_08)**
+Built with ❤️ by **[@shreyanshhh_08](https://t.me/shreyanshhh_08)**
 
-📺 Channel: **@aurabreaker7**
+📺 Channel: **[@aurabreaker7](https://t.me/aurabreaker7)**
 
 ⭐ If you like this project, consider giving it a star!
 
