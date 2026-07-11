@@ -220,27 +220,41 @@ def missing_link_column_message() -> str:
 
 
 def build_commands_keyboard() -> InlineKeyboardMarkup:
-    """Buttons for the bot's main commands.
+    """Buttons for the bot's main commands with color styling (PTB v22.7+)."""
+    # Green buttons (success)
+    stats_btn = InlineKeyboardButton("📊 Stats", callback_data="cmd_stats", style="success")
+    whoami_btn = InlineKeyboardButton("👤 Who am I", callback_data="cmd_whoami", style="success")
+    study_btn = InlineKeyboardButton("⏱️ Study Status", callback_data="cmd_study_status", style="success")
+    addtask_btn = InlineKeyboardButton("➕ Add Task", callback_data="cmd_task_help", style="success")
+    
+    # Blue buttons (primary)
+    webapp_btn = InlineKeyboardButton("🌐 Open TaskBoard", url=WEBAPP_URL, style="primary")
+    
+    # Red buttons (danger)
+    unlink_btn = InlineKeyboardButton("🔓 Unlink Account", callback_data="cmd_unlink_ask", style="danger")
 
-    Note: Telegram inline buttons have no color/style property (unlike, say,
-    Discord's ButtonStyle enum) — every button renders the same neutral gray.
-    Grouping + emoji is the only "styling" available here.
-    """
+    return InlineKeyboardMarkup([
+        [stats_btn, whoami_btn],
+        [study_btn, addtask_btn],
+        [webapp_btn],
+        [unlink_btn],
+    ])
+
+
+def get_unlink_confirmation_keyboard() -> InlineKeyboardMarkup:
+    """Confirmation keyboard for unlinking."""
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📊 Stats", callback_data="cmd_stats"),
-            InlineKeyboardButton("👤 Who am I", callback_data="cmd_whoami"),
-        ],
-        [
-            InlineKeyboardButton("⏱️ Study Status", callback_data="cmd_study_status"),
-            InlineKeyboardButton("➕ Add Task", callback_data="cmd_task_help"),
-        ],
-        [
-            InlineKeyboardButton("🌐 Open TaskBoard", url=WEBAPP_URL),
-        ],
-        [
-            InlineKeyboardButton("🔓 Unlink Account", callback_data="cmd_unlink_ask"),
-        ],
+            InlineKeyboardButton("✅ Yes, unlink", callback_data="cmd_unlink_confirm", style="primary"),
+            InlineKeyboardButton("❌ Cancel", callback_data="cmd_cancel", style="danger"),
+        ]
+    ])
+
+
+def get_login_keyboard(callback_url: str) -> InlineKeyboardMarkup:
+    """Login keyboard with web app button."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🚀 Sign in to TaskBoard", url=callback_url, style="success")]
     ])
 
 
@@ -287,15 +301,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             parse_mode=ParseMode.HTML,
         )
     elif data == "cmd_unlink_ask":
-        confirm_kb = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("✅ Yes, unlink", callback_data="cmd_unlink_confirm"),
-                InlineKeyboardButton("❌ Cancel", callback_data="cmd_cancel"),
-            ]
-        ])
         await query.message.reply_text(
             "Are you sure you want to unlink this chat from TaskBoard?",
-            reply_markup=confirm_kb,
+            reply_markup=get_unlink_confirmation_keyboard(),
         )
     elif data == "cmd_unlink_confirm":
         await unlink(update, context)
@@ -366,13 +374,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         })
 
         callback_url = f"{WEBAPP_URL}/api/auth/telegram/callback?token={token}"
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🚀 Sign in to TaskBoard", url=callback_url)]
-        ])
         sent = await update.message.reply_text(
-            f"Welcome, {display_name}! \u2728\n\n"
+            f"Welcome, {display_name}! ✨\n\n"
             f"Tap the button below to sign in:",
-            reply_markup=keyboard,
+            reply_markup=get_login_keyboard(callback_url),
         )
         # Remember this message so we can delete it once login is confirmed
         # (avoids a stale "Sign in" button sitting in the chat forever).
@@ -545,9 +550,6 @@ async def study(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Handle day boundary reset if active
     if study_date and study_date != today_date:
         # Archive yesterday's subjects to study_history
-        # .get() with defaults: legacy/partial subject rows used to raise
-        # KeyError here (via s['id']/s['secs']) and crash the whole
-        # /study command with a generic error.
         subjects_dict = {}
         for s in study_subjects:
             if not isinstance(s, dict) or s.get("id") is None:
