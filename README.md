@@ -4,7 +4,7 @@
 
 ### Daily tracker. Visual progress. Zero excuses.
 
-A clean, single-page productivity dashboard to plan your day, track tasks, and stay consistent — with a built-in study timer, analytics, and a global leaderboard. Part of the **BRAINY** ecosystem.
+A clean, single-page productivity dashboard to plan your day, track tasks, and stay consistent — with a built-in study timer, analytics, and a global leaderboard. 
 
 🔗 **[Live Demo → taskboard7.up.railway.app](https://taskboard7.up.railway.app/)**
 
