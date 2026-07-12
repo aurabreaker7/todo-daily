@@ -500,6 +500,11 @@ select.m-in{appearance:none;cursor:pointer}
 .focus-score-sub{font-size:.76rem;color:var(--text3);margin-top:2px}
 
 /* ── Leaderboard ── */
+.lb-tabs{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.lb-tab{background:var(--s1);border:1px solid var(--border);color:var(--text2);padding:8px 16px;border-radius:999px;font-size:.82rem;font-weight:600;cursor:pointer;transition:background .2s,border-color .2s,color .2s}
+.lb-tab:hover{border-color:var(--accent)}
+.lb-tab.on{background:var(--accent);border-color:var(--accent);color:#050a08}
+.lb-date-pick{background:var(--s1);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:999px;font-size:.8rem;font-family:inherit;margin-left:auto}
 .lb-podium{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
 .lb-podium-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:18px 12px;text-align:center;position:relative;overflow:hidden}
 .lb-podium-card.p1{border-color:rgba(240,184,66,.4);transform:translateY(-8px)}
@@ -534,4 +539,3 @@ select.m-in{appearance:none;cursor:pointer}
   .focus-score-card{flex-direction:column;text-align:center}
   .drawer{width:280px}
 }
-
