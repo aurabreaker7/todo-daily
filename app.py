@@ -35,6 +35,7 @@ from telegram_bot import (
 SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 SUPABASE_ANON_KEY = os.environ["SUPABASE_ANON_KEY"]
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.getenv("ALLOWED_ORIGINS", "*").split(",")
@@ -211,6 +212,8 @@ def restricted_params(table: str, raw_params: dict[str, str], profile: dict[str,
 @app.on_event("startup")
 async def startup() -> None:
     global telegram_app
+    index_path = os.path.join(BASE_DIR, "index.html")
+    print(f"[startup] index.html: {'found' if os.path.isfile(index_path) else 'MISSING'} at {index_path}")
     if not BOT_TOKEN:
         print("TELEGRAM_BOT_TOKEN is not set; website API will run without Telegram bot polling.")
         return
@@ -259,17 +262,7 @@ async def health() -> dict[str, str]:
 
 @app.get("/")
 async def index() -> FileResponse:
-    return FileResponse("index.html")
-
-
-@app.get("/style.css")
-async def style_css() -> FileResponse:
-    return FileResponse("style.css", media_type="text/css")
-
-
-@app.get("/script.js")
-async def script_js() -> FileResponse:
-    return FileResponse("script.js", media_type="application/javascript")
+    return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
 
 @app.post("/api/auth/login")
