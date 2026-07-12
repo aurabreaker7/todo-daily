@@ -636,40 +636,52 @@ async def leaderboard(date: str | None = None) -> list[dict[str, Any]]:
     without needing a separate realtime/websocket pipeline.
     """
     if date == "all":
-        return await sb.request(
-            "GET",
-            "leaderboard_view",
-            params={
-                "select": "id,name,total_study_seconds,today_study_seconds,study_date,xp_total,current_level,avatar_url",
-                "order": "total_study_seconds.desc",
-                "limit": "50",
-            },
-        )
+        try:
+            return await sb.request(
+                "GET",
+                "leaderboard_view",
+                params={
+                    "select": "id,name,total_study_seconds,today_study_seconds,study_date,xp_total,current_level,avatar_url",
+                    "order": "total_study_seconds.desc",
+                    "limit": "50",
+                },
+            )
+        except Exception as e:
+            print(f"[leaderboard] all-time query failed: {type(e).__name__}: {e}")
+            raise HTTPException(status_code=500, detail=f"leaderboard(all) failed: {e}")
 
     target_date = date or today_key()
 
-    hist_rows = await sb.request(
-        "GET",
-        "study_history",
-        params={
-            "date": f"eq.{target_date}",
-            "select": "user_id,total_secs,updated_at",
-            "order": "total_secs.desc",
-            "limit": "50",
-        },
-    )
+    try:
+        hist_rows = await sb.request(
+            "GET",
+            "study_history",
+            params={
+                "date": f"eq.{target_date}",
+                "select": "user_id,total_secs,updated_at",
+                "order": "total_secs.desc",
+                "limit": "50",
+            },
+        )
+    except Exception as e:
+        print(f"[leaderboard] study_history query failed for date={target_date}: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail=f"study_history query failed: {e}")
     if not hist_rows:
         return []
 
     user_ids = sorted({str(r["user_id"]) for r in hist_rows})
-    users_rows = await sb.request(
-        "GET",
-        "users",
-        params={
-            "id": f"in.({','.join(user_ids)})",
-            "select": "id,name,avatar_url,xp_total,current_level",
-        },
-    )
+    try:
+        users_rows = await sb.request(
+            "GET",
+            "users",
+            params={
+                "id": f"in.({','.join(user_ids)})",
+                "select": "id,name,avatar_url,xp_total,current_level",
+            },
+        )
+    except Exception as e:
+        print(f"[leaderboard] users query failed for ids={user_ids}: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail=f"users query failed: {e}")
     users_by_id = {str(u["id"]): u for u in users_rows}
 
     result: list[dict[str, Any]] = []
