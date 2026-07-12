@@ -372,7 +372,13 @@
 
   <!-- LEADERBOARD -->
   <div class="page" id="page-leaderboard">
-    <div class="ph"><h1>Global <em>Leaderboard</em> 🏆</h1><p>See how your study hours and focus stack up against the community.</p></div>
+    <div class="ph"><h1>Global <em>Leaderboard</em> 🏆</h1><p>See how your study hours and focus stack up against the community — updates live as people study.</p></div>
+    <div class="lb-tabs" id="lbTabs">
+      <button class="lb-tab on" data-range="today" onclick="setLeaderboardRange('today')">Today</button>
+      <button class="lb-tab" data-range="yesterday" onclick="setLeaderboardRange('yesterday')">Yesterday</button>
+      <button class="lb-tab" data-range="all" onclick="setLeaderboardRange('all')">All Time</button>
+      <input type="date" id="lbDatePick" class="lb-date-pick" onchange="setLeaderboardRange(this.value)"/>
+    </div>
     <div id="lbLoading" style="text-align:center;color:var(--text3);padding:30px 0">Loading rankings…</div>
     <div id="lbPodium" class="lb-podium" style="display:none"></div>
     <div id="lbTable" class="lb-table"></div>
