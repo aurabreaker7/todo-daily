@@ -724,7 +724,14 @@ async def rest_proxy(
     if method == "GET":
         return await sb.request("GET", table, params=params)
 
-    raw_payload = await request.json() if method in {"POST", "PATCH"} else None
+    if method in {"POST", "PATCH"}:
+        try:
+            raw_payload = await request.json()
+        except Exception as e:
+            print(f"[rest_proxy] {method} {table}: invalid/empty JSON body — {type(e).__name__}: {e}")
+            raise HTTPException(status_code=400, detail=f"Invalid JSON body: {e}")
+    else:
+        raw_payload = None
     # IMPORTANT: only strip nulls on INSERT (POST). On PATCH an explicit
     # `null` is intentional (e.g. clearing an active study_timer, or
     # unlinking telegram_chat_id) — stripping it there silently prevented
