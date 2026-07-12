@@ -26,6 +26,7 @@ from telegram_bot import (
     stats,
     study,
     task,
+    today_key,
     unlink,
     whoami,
 )
@@ -633,16 +634,69 @@ async def delete_task(
 
 
 @app.get("/api/leaderboard")
-async def leaderboard() -> list[dict[str, Any]]:
-    return await sb.request(
+async def leaderboard(date: str | None = None) -> list[dict[str, Any]]:
+    """Daily leaderboard by default (today, Asia/Kolkata) — pass ?date=all
+    for the all-time totals board, or ?date=YYYY-MM-DD for any specific day.
+    Daily rankings are built from `study_history`, which every device syncs
+    to roughly every 30s while a timer is running (see syncStudyToCloud in
+    script.js) — so scores here update within ~30s of someone studying,
+    without needing a separate realtime/websocket pipeline.
+    """
+    if date == "all":
+        return await sb.request(
+            "GET",
+            "leaderboard_view",
+            params={
+                "select": "id,name,total_study_seconds,today_study_seconds,study_date,xp_total,current_level,avatar_url",
+                "order": "total_study_seconds.desc",
+                "limit": "50",
+            },
+        )
+
+    target_date = date or today_key()
+
+    hist_rows = await sb.request(
         "GET",
-        "leaderboard_view",
+        "study_history",
         params={
-            "select": "id,name,total_study_seconds,today_study_seconds,study_date,xp_total,current_level,avatar_url",
-            "order": "total_study_seconds.desc",
+            "date": f"eq.{target_date}",
+            "select": "user_id,total_secs,updated_at",
+            "order": "total_secs.desc",
             "limit": "50",
         },
     )
+    if not hist_rows:
+        return []
+
+    user_ids = sorted({str(r["user_id"]) for r in hist_rows})
+    users_rows = await sb.request(
+        "GET",
+        "users",
+        params={
+            "id": f"in.({','.join(user_ids)})",
+            "select": "id,name,avatar_url,xp_total,current_level",
+        },
+    )
+    users_by_id = {str(u["id"]): u for u in users_rows}
+
+    result: list[dict[str, Any]] = []
+    for row in hist_rows:
+        u = users_by_id.get(str(row["user_id"]))
+        if not u or not u.get("name"):
+            continue
+        result.append(
+            {
+                "id": u["id"],
+                "name": u["name"],
+                "avatar_url": u.get("avatar_url"),
+                "today_study_seconds": row.get("total_secs") or 0,
+                "study_date": target_date,
+                "xp_total": u.get("xp_total"),
+                "current_level": u.get("current_level"),
+            }
+        )
+    result.sort(key=lambda r: r["today_study_seconds"], reverse=True)
+    return result
 
 
 @app.api_route("/api/rest/{table}", methods=["GET", "POST", "PATCH", "DELETE"])
