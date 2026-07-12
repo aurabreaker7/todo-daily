@@ -676,7 +676,7 @@ async def leaderboard(date: str | None = None) -> list[dict[str, Any]]:
             "users",
             params={
                 "id": f"in.({','.join(user_ids)})",
-                "select": "id,name,avatar_url,xp_total,current_level",
+                "select": "id,name,avatar_url",
             },
         )
     except Exception as e:
@@ -696,8 +696,6 @@ async def leaderboard(date: str | None = None) -> list[dict[str, Any]]:
                 "avatar_url": u.get("avatar_url"),
                 "today_study_seconds": row.get("total_secs") or 0,
                 "study_date": target_date,
-                "xp_total": u.get("xp_total"),
-                "current_level": u.get("current_level"),
             }
         )
     result.sort(key=lambda r: r["today_study_seconds"], reverse=True)
