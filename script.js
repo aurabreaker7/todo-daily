@@ -902,7 +902,7 @@ function showPage(p,btn){
   if(p==='calendar')renderCal();
   if(p==='analytics')renderAnalytics();
   if(p==='profile')renderProfile();
-  if(p==='leaderboard')renderLeaderboard();
+  if(p==='leaderboard'){ renderLeaderboard(); startLeaderboardPolling(); } else { stopLeaderboardPolling(); }
   if(p==='insights'){ saveStudyHistory(); renderInsights(); }
 }
 
@@ -1267,6 +1267,7 @@ async function renderProfile(){
 }
 
 // ══════════════════════════════════════
+// ══════════════════════════════════════
 //  GLOBAL PEER LEADERBOARD
 // ══════════════════════════════════════
 function fmtLbHours(secs){
@@ -1278,61 +1279,88 @@ function fmtLbHours(secs){
 function lbFocusScore(todaySecs){
   return Math.min(Math.round(((todaySecs||0)/14400)*40+ (todaySecs>0?40:0)*0.5),100);
 }
+function yesterdayKey(){ const d=new Date(); d.setDate(d.getDate()-1); return dKey(d); }
+let _lbRange='today';       // 'today' | 'yesterday' | 'all' | 'YYYY-MM-DD'
+let _lbPollTimer=null;
+function lbRangeToDateParam(range){
+  if(range==='today')return tKey();
+  if(range==='yesterday')return yesterdayKey();
+  if(range==='all')return 'all';
+  return range; // already a YYYY-MM-DD from the date picker
+}
+function setLeaderboardRange(range){
+  _lbRange=range;
+  document.querySelectorAll('#lbTabs .lb-tab').forEach(b=>b.classList.toggle('on',b.dataset.range===range));
+  const pick=document.getElementById('lbDatePick');
+  if(pick && ['today','yesterday','all'].includes(range)) pick.value='';
+  renderLeaderboard();
+}
 async function renderLeaderboard(){
   const loading=document.getElementById('lbLoading');
   const podiumEl=document.getElementById('lbPodium');
   const tableEl=document.getElementById('lbTable');
-  loading.style.display='block';loading.textContent='Loading rankings…';
-  podiumEl.style.display='none';podiumEl.innerHTML='';tableEl.innerHTML='';
+  const isFirstLoad=!tableEl.innerHTML;
+  if(isFirstLoad){ loading.style.display='block'; loading.textContent='Loading rankings…'; }
   try{
-    const {data:rows,error}=await supa.from('leaderboard_view')
-      .select('id,name,total_study_seconds,today_study_seconds,study_date')
-      .order('total_study_seconds',{ascending:false})
-      .limit(50);
-    if(error) throw error;
-    const ranked=(rows||[]).filter(r=>r.name);
+    const dateParam=lbRangeToDateParam(_lbRange);
+    const rows=await apiFetch('/api/leaderboard'+encodeParams({date:dateParam}))||[];
+    const ranked=rows.filter(r=>r.name);
+    const isAllTime=dateParam==='all';
+    const primarySecsKey=isAllTime?'total_study_seconds':'today_study_seconds';
     if(!ranked.length){
-      loading.textContent='No peers ranked yet — start a study session to appear here!';
+      loading.style.display='block';
+      podiumEl.style.display='none'; podiumEl.innerHTML=''; tableEl.innerHTML='';
+      loading.textContent=isAllTime
+        ? 'No peers ranked yet — start a study session to appear here!'
+        : 'Nobody has studied on this day yet — be the first! ⏱️';
       return;
     }
     loading.style.display='none';
     const medals=['🥇','🥈','🥉'];
     const top3=ranked.slice(0,3);
-    if(top3.length){
-      podiumEl.style.display='grid';
-      // Render in visual podium order (2nd, 1st, 3rd) while keeping true rank in the label
-      const order=[1,0,2].filter(i=>top3[i]);
-      podiumEl.innerHTML=order.map(i=>{
-        const r=top3[i];
-        const ini=r.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
-        return `<div class="lb-podium-card p${i+1}">
-          <div class="lb-medal">${medals[i]}</div>
-          <div class="lb-podium-av">${ini}</div>
-          <div class="lb-podium-name">${esc(r.name)}${r.id===CU_ID?' (You)':''}</div>
-          <div class="lb-podium-stat">${fmtLbHours(r.total_study_seconds)} total</div>
-        </div>`;
-      }).join('');
-    }
+    podiumEl.style.display='grid';
+    const order=[1,0,2].filter(i=>top3[i]);
+    podiumEl.innerHTML=order.map(i=>{
+      const r=top3[i];
+      const ini=(r.name||'U').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+      return `<div class="lb-podium-card p${i+1}">
+        <div class="lb-medal">${medals[i]}</div>
+        <div class="lb-podium-av">${r.avatar_url?`<img alt="" src="${esc(r.avatar_url)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">`:ini}</div>
+        <div class="lb-podium-name">${esc(r.name)}${r.id===CU_ID?' (You)':''}</div>
+        <div class="lb-podium-stat">${fmtLbHours(r[primarySecsKey])} ${isAllTime?'total':'today'}</div>
+      </div>`;
+    }).join('');
     tableEl.innerHTML=ranked.map((r,i)=>{
-      const ini=r.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+      const ini=(r.name||'U').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
       const isMe=r.id===CU_ID;
-      const isTodayFresh=r.study_date===tKey();
-      const todaySecs=isTodayFresh?(r.today_study_seconds||0):0;
+      const secs=r[primarySecsKey]||0;
       return `<div class="lb-row ${isMe?'me':''}">
         <div class="lb-rank">${i<3?medals[i]:'#'+(i+1)}</div>
-        <div class="lb-av">${ini}</div>
+        <div class="lb-av">${r.avatar_url?`<img alt="" src="${esc(r.avatar_url)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">`:ini}</div>
         <div class="lb-name">${esc(r.name)}${isMe?' <span style="color:var(--accent)">· You</span>':''}</div>
         <div class="lb-stats">
-          <div class="lb-stat"><div class="lb-stat-val">${fmtLbHours(r.total_study_seconds)}</div><div class="lb-stat-lbl">Total</div></div>
-          <div class="lb-stat"><div class="lb-stat-val">${lbFocusScore(todaySecs)}%</div><div class="lb-stat-lbl">Focus</div></div>
+          <div class="lb-stat"><div class="lb-stat-val">${fmtLbHours(secs)}</div><div class="lb-stat-lbl">${isAllTime?'Total':'Today'}</div></div>
+          <div class="lb-stat"><div class="lb-stat-val">${lbFocusScore(isAllTime?r.today_study_seconds:secs)}%</div><div class="lb-stat-lbl">Focus</div></div>
         </div>
       </div>`;
     }).join('');
   }catch(e){
     console.error(e);
-    loading.textContent='Could not load the leaderboard. Make sure total_study_seconds / today_study_seconds / study_date columns exist on the users table.';
+    if(isFirstLoad){
+      loading.style.display='block';
+      loading.textContent='Could not load the leaderboard. Please try again in a moment.';
+    }
   }
 }
+// Keep the open leaderboard page feeling "live" — peers sync their study time to
+// the cloud roughly every 30s while a timer runs, so poll a little slower than that.
+function startLeaderboardPolling(){
+  stopLeaderboardPolling();
+  _lbPollTimer=setInterval(()=>{
+    if(document.getElementById('page-leaderboard')?.classList.contains('on')) renderLeaderboard();
+  },20000);
+}
+function stopLeaderboardPolling(){ if(_lbPollTimer){ clearInterval(_lbPollTimer); _lbPollTimer=null; } }
 
 // THEME
 let isDark=true;
